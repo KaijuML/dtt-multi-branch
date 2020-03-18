@@ -7,7 +7,8 @@ Scripts assume you are in the `data/` repository, with the following file:
 
 ```
 .
-├── format-wikibio.py              
+├── format_wikibio.py
+├── pos_tagging.py        
 ```
 
 ## WikiBIO download and basic formating
