@@ -14,6 +14,7 @@ import traceback
 
 import onmt.utils
 from onmt.utils.logging import logger
+from torch.nn.utils.rnn import pad_sequence
 
 
 def build_trainer(opt, device_id, model, fields, optim, model_saver=None):
@@ -56,6 +57,8 @@ def build_trainer(opt, device_id, model, fields, optim, model_saver=None):
     earlystopper = onmt.utils.EarlyStopping(
         opt.early_stopping, scorers=onmt.utils.scorers_from_opts(opt)) \
         if opt.early_stopping > 0 else None
+    
+    weights_file = opt.weights_file if opt.weights_file else None
 
     report_manager = onmt.utils.build_report_manager(opt, gpu_rank)
     trainer = onmt.Trainer(model, train_loss, valid_loss, optim, trunc_size,
@@ -70,7 +73,8 @@ def build_trainer(opt, device_id, model, fields, optim, model_saver=None):
                            model_dtype=opt.model_dtype,
                            earlystopper=earlystopper,
                            dropout=dropout,
-                           dropout_steps=dropout_steps)
+                           dropout_steps=dropout_steps,
+                           weights_file=weights_file)
     return trainer
 
 
@@ -107,7 +111,8 @@ class Trainer(object):
                  n_gpu=1, gpu_rank=1, gpu_verbose_level=0,
                  report_manager=None, with_align=False, model_saver=None,
                  average_decay=0, average_every=1, model_dtype='fp32',
-                 earlystopper=None, dropout=[0.3], dropout_steps=[0]):
+                 earlystopper=None, dropout=[0.3], dropout_steps=[0],
+                 weights_file=None):
         # Basic attributes.
         self.model = model
         self.train_loss = train_loss
@@ -142,6 +147,13 @@ class Trainer(object):
 
         # Set model in training mode.
         self.model.train()
+        
+        # Load weights in case of multi-branches rnn training
+        if weights_file:
+            with open(weights_file, mode="r", encoding="utf8") as f:
+                self.decoder_rnn_weights = json.load(f)
+        else:
+            self.decoder_rnn_weights = None
 
     def _accum_count(self, step):
         for i in range(len(self.accum_steps)):
@@ -360,9 +372,17 @@ class Trainer(object):
                 # 2. F-prop all but generator.
                 if self.accum_count == 1:
                     self.optim.zero_grad()
-
+                    
+                if self.decoder_rnn_weights:
+                    kwargs = {'dec_weights': pad_sequence([
+                        torch.Tensor(self.decoder_rnn_weights[batch.indices[b].item()])
+                        for b in range(batch.batch_size)
+                    ])}
+                else:
+                    kwargs = dict()
+                    
                 outputs, attns = self.model(src, tgt, src_lengths, bptt=bptt,
-                                            with_align=self.with_align)
+                                            with_align=self.with_align, **kwargs)
                 bptt = True
 
                 # 3. Compute loss.
