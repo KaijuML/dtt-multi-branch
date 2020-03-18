@@ -211,7 +211,7 @@ class RNNDecoderBase(DecoderBase):
         """
 
         dec_state, dec_outs, attns = self._run_forward_pass(
-            tgt, memory_bank, memory_lengths=memory_lengths)
+            tgt, memory_bank, memory_lengths=memory_lengths, **kwargs)
 
         # Update the state with the result.
         if not isinstance(dec_state, tuple):

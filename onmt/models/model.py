@@ -17,7 +17,7 @@ class NMTModel(nn.Module):
         self.encoder = encoder
         self.decoder = decoder
 
-    def forward(self, src, tgt, lengths, bptt=False, with_align=False):
+    def forward(self, src, tgt, lengths, bptt=False, with_align=False, **kwargs):
         """Forward propagate a `src` and `tgt` pair for training.
         Possible initialized with a beginning decoder state.
 
@@ -41,14 +41,19 @@ class NMTModel(nn.Module):
             * dictionary attention dists of ``(tgt_len, batch, src_len)``
         """
         dec_in = tgt[:-1]  # exclude last target from inputs
+        
+        # separate additionnal args for encoder/decoder
+        enc_kwargs = {key[4:]: value for key, value in kwargs.items() if key.startswith('enc')}
+        dec_kwargs = {key[4:]: value for key, value in kwargs.items() if key.startswith('dec')}
 
-        enc_state, memory_bank, lengths = self.encoder(src, lengths)
+        enc_state, memory_bank, lengths = self.encoder(src, lengths, **enc_kwargs)
 
         if bptt is False:
             self.decoder.init_state(src, memory_bank, enc_state)
         dec_out, attns = self.decoder(dec_in, memory_bank,
                                       memory_lengths=lengths,
-                                      with_align=with_align)
+                                      with_align=with_align,
+                                      **dec_kwargs)
         return dec_out, attns
 
     def update_dropout(self, dropout):
