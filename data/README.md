@@ -5,18 +5,16 @@ Most scripts are reused from previous work on these dataset to ensure results ar
 
 Specificaly, wikibio formating script comes from [this great repo](https://github.com/tyliupku/wiki2bio/blob/master/preprocess.py)
 
-Scripts assume you are in the `data/` repository, with the following files:
+Scripts assume you are in the `data/` repository, with the following file:
 
 ```
 .
-├── create-dataset.py              # Wrapper for simplicity
-├── format-wikibio.py              # self explanatory
-├── format-webnlg.py               # self explanatory
+├── format-wikibio.py              
 ```
 
 ## WikiBIO
 
-Download and unpack the dataset the dataset:
+Download and unpack the dataset:
 
 ```
 git clone https://github.com/DavidGrangier/wikipedia-biography-dataset.git
