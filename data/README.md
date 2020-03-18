@@ -1,9 +1,7 @@
 # Dataset creation
 
 Instructions to download and format datasets for this projects.
-Most scripts are reused from previous work on these dataset to ensure results are not from better preprocessing.
-
-Specificaly, wikibio formating script comes from [this great repo](https://github.com/tyliupku/wiki2bio/blob/master/preprocess.py)
+WikiBIO formating script comes from [this great repo](https://github.com/tyliupku/wiki2bio/blob/master/preprocess.py)
 
 Scripts assume you are in the `data/` repository, with the following file:
 
@@ -12,7 +10,7 @@ Scripts assume you are in the `data/` repository, with the following file:
 ├── format-wikibio.py              
 ```
 
-## WikiBIO
+## WikiBIO download and basic formating
 
 Download and unpack the dataset:
 
@@ -32,4 +30,16 @@ create the dataset:
 
 ```
 python format_wikibio.py
+```
+
+## WikiBIO Part-of-Speech tagging
+
+We use huggingface/transformers to train a PoS-tagger on [UniversalDependencies english treebank](https://github.com/UniversalDependencies/UD_English-ParTUT)
+
+In order to do this, you will need the following libraries: `pip install transformers pyconll`
+
+To train the model and tag wikibio train/valid/test sets:
+
+```
+python pos_tagging.py --do_train --do-tagging train valid test
 ```
