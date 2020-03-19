@@ -1,6 +1,8 @@
 # custom
+experiments/
 data/wikibio/
 data/pos
+*.ipynb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
