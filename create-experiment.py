@@ -30,5 +30,5 @@ if __name__ == '__main__':
     os.mkdir(os.path.join(folder, 'gens', 'test'))
     os.mkdir(os.path.join(folder, 'gens', 'valid'))
     
-    print(f'Experiment {args.name} created.')
+    print(f"Experiment '{args.name}' created.")
     
