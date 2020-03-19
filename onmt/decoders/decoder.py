@@ -256,7 +256,7 @@ class StdRNNDecoder(RNNDecoderBase):
     or `copy_attn` support.
     """
 
-    def _run_forward_pass(self, tgt, memory_bank, memory_lengths=None):
+    def _run_forward_pass(self, tgt, memory_bank, memory_lengths=None, **kwargs):
         """
         Private helper for running the specific RNN forward pass.
         Must be overriden by all subclasses.
@@ -356,7 +356,7 @@ class InputFeedRNNDecoder(RNNDecoderBase):
           G --> H
     """
 
-    def _run_forward_pass(self, tgt, memory_bank, memory_lengths=None):
+    def _run_forward_pass(self, tgt, memory_bank, memory_lengths=None, **kwargs):
         """
         See StdRNNDecoder._run_forward_pass() for description
         of arguments and return values.

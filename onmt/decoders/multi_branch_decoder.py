@@ -4,7 +4,6 @@ import torch.nn as nn
 from onmt.models.stacked_rnn import StackedLSTM, StackedGRU
 from onmt.modules import context_gate_factory, GlobalAttention
 from onmt.utils.rnn_factory import rnn_factory
-from onmt.decoder
 
 from onmt.utils.misc import aeq
 from onmt.decoders.decoder import RNNDecoderBase
@@ -94,11 +93,12 @@ class MultiBranchRNNDecoder(RNNDecoderBase):
             opt.reuse_copy_attn,
             opt.copy_attn_type)
 
-    def _run_forward_pass(self, tgt, memory_bank, memory_lengths=None, weights=None):
+    def _run_forward_pass(self, tgt, memory_bank, memory_lengths=None, **kwargs):
         """
         See StdRNNDecoder._run_forward_pass() for description
         of arguments and return values.
         """
+        weights = kwargs.pop('weights', None)
         assert weights is not None
         
         # Additional args check.
@@ -132,9 +132,9 @@ class MultiBranchRNNDecoder(RNNDecoderBase):
                 tmp_output, tmp_state = rnn(decoder_input, dec_state)
                 new_states.append(tmp_state)
                 if jdx == 0:
-                    rnn_output = weights[idx, :, jdx] * tmp_output
+                    rnn_output = weights[idx, :, jdx:jdx+1] * tmp_output
                 else:
-                    rnn_output += weights[idx, :, jdx] * tmp_output
+                    rnn_output += weights[idx, :, jdx:jdx+1] * tmp_output
 
             dec_states = new_states
                     
