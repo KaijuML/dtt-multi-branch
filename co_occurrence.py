@@ -1,3 +1,8 @@
+"""
+Creates the hallucination score file {subset}_h.txt, using information from PoS tags (assumed in {subset}_pos.txt)
+and Spacy detected in-sentence dependencies.
+"""
+
 import json
 import os
 from collections import Counter
@@ -11,11 +16,12 @@ data_folder = path.join('data', 'wikibio')
 
 subset = 'train'
 assert subset in ['train', 'valid', 'test']
+
 tables_filename = path.join(data_folder, f'{subset}_tables.jl')
 pos_filename = path.join(data_folder, f'{subset}_pos.txt')
 hallucination_filename = path.join(data_folder, f'{subset}_h.txt')
 
-num_references = int(os.popen(f'wc -l < {path.join(data_folder, f"{subset}_tables.jl")}').read())
+num_examples = int(os.popen(f'wc -l < {path.join(data_folder, f"{subset}_tables.jl")}').read())
 num_words = int(os.popen(f'wc -l < {path.join(data_folder, f"{subset}_pos.txt")}').read())
 
 interesting_tags = ['NOUN', 'ADJ', 'NUM', 'PROPN']
@@ -49,32 +55,11 @@ def build_sentence_object(token_list):
     return sentence
 
 
-def counter_to_perc(c):
-    """Converts a Counter object to a general dict whose values are expressed as percent of the total original count."""
-    total = sum(c.values())
-    return {k: v / total for k, v in c.items()}
-
-
-def dict_to_tuples(d, prefix=tuple()):
-    """
-    Extract tuples representing nested tables elements.
-    Needed for more sophisticated datasets such as Rotowire/SBNation.
-
-    Example:
-        >>> d = {'a': 0, 'b': {'c': 1, 'd': 2}}
-        >>> dict_to_tuples(d)
-        [('a', 0), ('b', 'c', 1), ('b', 'd', 2)]
-    """
-    tuples = []
-    for key, value in d.items():
-        if type(value) is dict:
-            tuples += dict_to_tuples(value, prefix=prefix + (key,))
-        else:
-            tuples.append(prefix + (key, value))
-    return tuples
-
-
 def expand(token, h):
+    """
+    Expands an hallucinated token
+    i.e. tags the related (according to the dependence tree) tokens as hallucinations too
+    """
     ancestor = ascend_dependency_tree(token)
     if ancestor:
         for t in ancestor.subtree:
@@ -83,6 +68,9 @@ def expand(token, h):
 
 
 def get_allowed_words(table, co_occur):
+    """
+    Returns: the set of key, values and (key, value) common co-occurrences
+    """
     # [[<key_0>, [<token_00>, ..., <token_0m>]], ..., [<key_n>, [<token_n0>, ..., <token_nm>]]]
     table = json.loads(table)
     # {<token_00>, ..., <token_nm>}
@@ -101,6 +89,9 @@ def get_allowed_words(table, co_occur):
 
 
 def handle_sentence_punctuation(sentence, h):
+    """
+    Adjusts the hallucination scores using simple punctuation-related heuristics
+    """
     for token in sentence:
         # Conjunctions and comma near hallucinations are hallucinated
         if (token.dep_ == 'cc' or token.text == ',') \
@@ -151,7 +142,7 @@ def main():
     co_occur = dict()
     references = []
     with open(tables_filename) as tables_file, open(pos_filename) as refs_file:
-        for _ in trange(num_references, desc='Counting co-occurrences'):
+        for _ in trange(num_examples, desc='Counting co-occurrences'):
             sentence, sent_interesting_tokens = read_sentence(refs_file)
             references.append(sentence)
 
@@ -184,7 +175,7 @@ def main():
     # Score each sentence token, according to the corresponding table and its co-occurrences
     #
     with open(tables_filename) as tables_file, open(hallucination_filename, 'w') as hallucination_file:
-        for i, table in tqdm(enumerate(tables_file)):
+        for i, table in tqdm(enumerate(tables_file), desc='Scoring tokens', total=num_examples):
             allowed_words = get_allowed_words(table, co_occur)
             sentence = build_sentence_object(references[i])
             h = [0 for _ in range(len(sentence))]

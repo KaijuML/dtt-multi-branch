@@ -9,7 +9,7 @@ import spacy
 from spacy.tokens.doc import Doc
 from tqdm import tqdm
 
-from co_occurrence import data_folder, num_references
+from co_occurrence import data_folder, num_examples
 
 subset = 'train'
 assert subset in ['train', 'valid', 'test']
@@ -23,7 +23,7 @@ def main():
 
     with open(path.join(data_folder, f'{subset}_output.txt')) as f_refs, \
             open(path.join(data_folder, f'{subset}_pos_spacy.txt'), 'w') as f_tags:
-        for sentence in tqdm(f_refs, total=num_references):
+        for sentence in tqdm(f_refs, total=num_examples):
             sentence = Doc(nlp.vocab, sentence.split())
             sentence = nlp.tagger(sentence)
             for token in sentence:
