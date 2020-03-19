@@ -7,6 +7,10 @@ from itertools import islice, repeat
 import os
 
 
+def get_model_device(model):
+    return next(model.parameters()).device
+
+
 def split_corpus(path, shard_size, default=None):
     """yield a `list` containing `shard_size` line of `path`,
     or repeatly generate `default` if `path` is None.
