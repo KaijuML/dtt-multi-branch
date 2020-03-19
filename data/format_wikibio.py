@@ -154,7 +154,7 @@ def extract_first_sentence(folder):
     for setname in ['train', 'valid', 'test']:
         inputnb_filename = os.path.join(folder, 'raw', setname, f"{setname}.nb")
         inputsent_filename = os.path.join(folder, 'raw', setname, f"{setname}.sent")
-        output_filename = os.path.join(folder, f"{setname}_output.txt")
+        output_filename = os.path.join(folder, 'full', f"{setname}_output.txt")
         
         nb = [0]
         with open(inputnb_filename, encoding='utf8', mode='r') as f:
@@ -184,7 +184,7 @@ def create_tables(folder):
     DELIM = u"￨"  # delim used by onmt
     
     for setname in ['train', 'valid', 'test']:
-        input_filename = os.path.join(folder, f"{setname}_input.txt")
+        input_filename = os.path.join(folder, 'full', f"{setname}_input.txt")
         with open(input_filename, mode="r", encoding="utf8") as f:
             # each line is a table. Each token is a value in the table.
             # We take the value/label of the token and discard the pos
@@ -214,7 +214,7 @@ def create_tables(folder):
                 assert len(vals) == 0  # we exhausted all tokens
                 tables.append(table)
                 
-        output_filename = os.path.join(folder, f"{setname}_tables.jl")
+        output_filename = os.path.join(folder, 'full', f"{setname}_tables.jl")
         with open(output_filename, mode="w", encoding="utf8") as f:
             for table in tables: f.write(json.dumps(table) + '\n')
 
@@ -252,6 +252,7 @@ def preprocess(folder):
 
 
 def make_dirs(folder):
+    os.mkdir(os.path.join(folder, 'full'))
     os.mkdir(os.path.join(folder, "processed_data/"))
     os.mkdir(os.path.join(folder, "processed_data/train/"))
     os.mkdir(os.path.join(folder, "processed_data/test/"))

@@ -151,7 +151,7 @@ if __name__ == '__main__':
     
     
     pos_folder = pkg_resources.resource_filename(__name__, 'pos')
-    wiki_folder = pkg_resources.resource_filename(__name__, 'wikbio')
+    wiki_folder = pkg_resources.resource_filename(__name__, 'wikbio/full')
     
     if args.do_train:
         do_train(pos_folder)
