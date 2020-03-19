@@ -286,10 +286,10 @@ def _get_parser():
     return parser
 
 
-def main():
+def main(args=None):
     parser = _get_parser()
 
-    opt = parser.parse_args()
+    opt = parser.parse_args(args) if args else parser.parse_args()
     preprocess(opt)
 
 
