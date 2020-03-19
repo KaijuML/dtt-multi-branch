@@ -155,10 +155,17 @@ class Trainer(object):
         
         # Load weights in case of multi-branches rnn training
         if weights_file:
-            with open(weights_file, mode="r", encoding="utf8") as f:
-                self.decoder_rnn_weights = json.load(f)
+            self.decoder_rnn_weights = self.load_weights_file(weights_file)
         else:
             self.decoder_rnn_weights = None
+            
+    @staticmethod
+    def load_weights_file(path):
+        with open(path, mode="r", encoding="utf8") as f:
+            return [
+                torch.Tensor([list(map(int, s.split(':'))) for s in line.split()])
+                for line in f
+            ]
 
     def _accum_count(self, step):
         for i in range(len(self.accum_steps)):

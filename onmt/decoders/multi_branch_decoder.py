@@ -9,7 +9,6 @@ from onmt.utils.misc import aeq
 from onmt.decoders.decoder import RNNDecoderBase
 
 
-
 class MultiBranchRNNDecoder(RNNDecoderBase):
     def __init__(self, rnn_type, bidirectional_encoder, num_layers,
                  hidden_size, nb_branches,
