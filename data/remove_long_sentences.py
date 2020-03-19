@@ -30,18 +30,17 @@ def main(args):
                     indices_to_removes.add(idx)
                 else:
                     g.write(line + '\n')
-                    
-        
-        full_output_path = os.path.join(folder, 'full', f'{setname}_input.txt')
-        final_output_path = os.path.join(folder, f'{setname}_input.txt')
-        with open(full_output_path, mode="r", encoding='utf8') as f, \
-                open(final_output_path, mode="w", encoding='utf8') as f:
-            
-            for idx, line in enumerate(f):
-                if idx in indices_to_removes:
-                    continue
-                else:
-                    g.write(line.strip() + '\n')
+        for suffix in ['input.txt', 'tables.jl']:
+            full_output_path = os.path.join(folder, 'full', f'{setname}_{suffix}')
+            final_output_path = os.path.join(folder, f'{setname}_{suffix}')
+            with open(full_output_path, mode="r", encoding='utf8') as f, \
+                    open(final_output_path, mode="w", encoding='utf8') as f:
+
+                for idx, line in enumerate(f):
+                    if idx in indices_to_removes:
+                        continue
+                    else:
+                        g.write(line.strip() + '\n')
 
 
 if __name__ == '__main__':
