@@ -9,12 +9,15 @@
           users of this library) for the strategy things we do.
 """
 
+from torch.nn.utils.rnn import pad_sequence
+
 import torch
 import traceback
 
-import onmt.utils
+from onmt.utils.misc import get_model_device
 from onmt.utils.logging import logger
-from torch.nn.utils.rnn import pad_sequence
+
+import onmt.utils
 
 
 def build_trainer(opt, device_id, model, fields, optim, model_saver=None):
@@ -144,6 +147,8 @@ class Trainer(object):
                 assert self.trunc_size == 0, \
                     """To enable accumulated gradients,
                        you must disable target sequence truncating."""
+                
+        self._dev = get_model_device(self.model)
 
         # Set model in training mode.
         self.model.train()
@@ -377,7 +382,7 @@ class Trainer(object):
                     kwargs = {'dec_weights': pad_sequence([
                         torch.Tensor(self.decoder_rnn_weights[batch.indices[b].item()])
                         for b in range(batch.batch_size)
-                    ])}
+                    ], batch_first=False).to(self._dev)}
                 else:
                     kwargs = dict()
                     

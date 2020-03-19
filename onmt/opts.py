@@ -74,10 +74,10 @@ def model_opts(parser):
                    "are experimental. Options are "
                    "[rnn|brnn|mean|transformer|cnn].")
     group.add('--decoder_type', '-decoder_type', type=str, default='rnn',
-              choices=['rnn', 'transformer', 'cnn'],
+              choices=['rnn', 'transformer', 'cnn', 'mbrnn'],
               help="Type of decoder layer to use. Non-RNN layers "
                    "are experimental. Options are "
-                   "[rnn|transformer|cnn].")
+                   "[rnn|transformer|cnn|mbrnn].")
 
     group.add('--layers', '-layers', type=int, default=-1,
               help='Number of layers in enc/dec.')
@@ -105,6 +105,12 @@ def model_opts(parser):
     group.add('--cnn_kernel_width', '-cnn_kernel_width', type=int, default=3,
               help="Size of windows in the cnn, the kernel_size is "
                    "(cnn_kernel_width, 1) in conv layer")
+    
+    # New parameters used in mutli branch decoder
+    group.add('--nb_branches', '-nb_branches', type=int, default=2,
+              help='Number of branches in multi branch decoder.')
+    group.add('--weights_file', '-weights_file', type=str, default='',
+              help='Path to the weights used to merge branches in multi branch decodeur')
 
     group.add('--input_feed', '-input_feed', type=int, default=1,
               help="Feed the context vector at each time step as "
