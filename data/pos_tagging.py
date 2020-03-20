@@ -66,7 +66,7 @@ def do_train(folder, gpus):
     label_file = os.path.join(folder, 'labels.txt')
     if not os.path.exists(label_file):
         print('Extracting unique labels in labels.txt')
-        shell(f'cat train.txt | cut -d " " -f 2 | grep -v "^$"| sort | uniq > {label_file}')
+        shell(f'cat {train_file} | cut -d " " -f 2 | grep -v "^$"| sort | uniq > {label_file}')
         
         
     env_variables = {
@@ -95,7 +95,7 @@ def do_train(folder, gpus):
 
     shell(f'{env_variables} python run_ner.py {training_args} --do_train')
 
-def do_tagging(pos_folder, wiki_folder, setnames, gpus):
+def do_tagging(pos_folder, wiki_folder, fullwiki_folder, setnames, gpus):
     """This will format the train/dev/test sets of wikibio 
     so that we can run the PoS tagging network we have trained"""
     
@@ -112,11 +112,15 @@ def do_tagging(pos_folder, wiki_folder, setnames, gpus):
     for setname in setnames:
         assert setname in ['train', 'valid', 'test']
         print(f'Loading examples from {setname}')
-        with open(f'{wiki_folder}/{setname}_output.txt', mode='r', encoding='utf8') as f:
+        
+        path = os.path.join(fullwiki_folder, '{setname}_output.txt')
+        with open(path, mode='r', encoding='utf8') as f:
             examples = [line.strip() for line in f if line.strip()]
             
         print('Formating examples (one token per line)')
-        with open(f'{folder}/test.txt', mode='w', encoding='utf8') as f:
+        
+        path = os.path.join(pos_folder, 'test.txt')
+        with open(path, mode='w', encoding='utf8') as f:
             for example in examples:
                 for token in example.split():
                     f.write(f'{tok_mapping.get(token, token)}\n')
@@ -128,9 +132,9 @@ def do_tagging(pos_folder, wiki_folder, setnames, gpus):
             'python run_ner.py',
             f'--data_dir {pos_folder}/',
             '--model_type bert',
-            f'--labels {pos_folder}/labels.txt',
+            f'--labels {os.path.join(pos_folder, "labels.txt")}',
             '--model_name_or_path bert-base-uncased',
-            f'--output_dir {pos_folder}/trained',
+            f'--output_dir {os.path.join(pos_folder, "trained")}',
             '--max_seq_length 256',
             '--do_predict',
             '--per_gpu_eval_batch_size 64'
@@ -138,8 +142,10 @@ def do_tagging(pos_folder, wiki_folder, setnames, gpus):
         shell(cmd)
         
         print('Moving prediction file to data/wikibio')
-        shell(f'cp {pos_folder}/trained/test_predictions.txt {wiki_folder}/{setname}_pos.txt')
-        shell(f'rm {pos_folder}/cached_test_bert-base-uncased_256')
+        orig = os.path.join(pos_folder, 'trainder', 'test_predictions.txt')
+        dest = os.path.join(wiki_folder, f'{setname}_pos.txt')
+        shell(f'cp {orig} {dest}')
+        shell(f'rm {os.path.join(pos_folder, "cached_test_bert-base-uncased_256")}')
 
 if __name__ == '__main__':
     
@@ -155,11 +161,14 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     pos_folder = pkg_resources.resource_filename(__name__, 'pos')
-    wiki_folder = pkg_resources.resource_filename(__name__, 'wikibio/full')
+    wiki_folder = pkg_resources.resource_filename(__name__, 'wikibio')
+    fullwiki_folder = os.path.join('wikibio', 'full')
+    fullwiki_folder = pkg_resources.resource_filename(__name__, fullwiki_folder)
     
     gpus = ','.join(map(str, args.gpus))
     if not gpus:
         print('Not using gpu can be significantly slower.')
+        print('You can specify devices using --gpu 0 1 2 3 for example.')
     else:
         print(f'Using the following device{"s" if len(args.gpus)>1 else ""}: [{gpus}]' )
     
@@ -167,4 +176,4 @@ if __name__ == '__main__':
         do_train(pos_folder, gpus)
         
     if args.do_tagging:
-        do_tagging(pos_folder, wiki_folder, args.do_tagging, gpus)
+        do_tagging(pos_folder, wiki_folder, fullwiki_folder, args.do_tagging, gpus)
