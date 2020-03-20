@@ -65,7 +65,7 @@ We use huggingface/transformers to train a PoS-tagger on [UniversalDependencies 
 
 In order to do this, you will need the following libraries: `pip install transformers pyconll seqeval tensorboardX`
 
-To train the model and tag wikibio train/valid/test sets:
+To train the model and tag wikibio train/valid/test sets (training is quick (few minutes) however tagging the ~700K wikibio examples can take one or two hours):
 
 ```
 python pos_tagging.py --do_train --do-tagging train valid test --gpus 0 1
