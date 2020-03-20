@@ -140,7 +140,7 @@ def create_input(folder):
             )
         
         
-        input_filename = os.path.join(folder, f"{setname}_input.txt")
+        input_filename = os.path.join(folder, 'full', f"{setname}_input.txt")
         with open(input_filename, mode="w", encoding="utf8") as f:
             for i in input:
                 f.write(i + "\n")
