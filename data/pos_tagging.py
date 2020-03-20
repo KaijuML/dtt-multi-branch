@@ -159,7 +159,7 @@ def do_tagging(pos_folder, wiki_folder, setnames, gpus, split_size=int(5e4)):
                 if not line.strip(): continue
                 examples.append(line.strip())
                 
-                if if split_size>0 and len(examples) >= split_size:
+                if split_size>0 and len(examples) >= split_size:
                     run_script(examples, pos_folder, wiki_folder, setname, gpus)
                     examples = list()
                     
