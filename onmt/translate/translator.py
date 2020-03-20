@@ -154,7 +154,14 @@ class Translator(object):
         self.random_sampling_temp = random_sampling_temp
         self.sample_from_topk = random_sampling_topk
         
-        self.rnn_weights = rnn_weights
+        if rnn_weights is not None:
+            if not len(rnn_weights) == len(self.model.decoder.rnns):
+                raise ValueError('Please specify exactly on weights per branch'
+                                 f'Got {len(rnn_weights)} weights and '
+                                 f'{len(self.model.decoder.rnns)} branches.')
+            self.rnn_weights = torch.Tensor(rnn_weights).view(1, 1, -1).to(self._dev)
+        else:
+            self.rnn_weights = None
         
         self.min_length = min_length
         self.ratio = ratio
@@ -201,6 +208,8 @@ class Translator(object):
                 "log_probs": []}
 
         set_random_seed(seed, self._use_cuda)
+        
+        assert not self.model.training
 
     @classmethod
     def from_opt(
@@ -585,8 +594,17 @@ class Translator(object):
         # and [src_len, batch, hidden] as memory_bank
         # in case of inference tgt_len = 1, batch = beam times batch_size
         # in case of Gold Scoring tgt_len = actual length, batch = 1 batch
+        
+        tgt_len, batch_size, nfeats = decoder_in.shape
+        
+        if self.rnn_weights is not None:
+            kwargs = {'weights' : self.rnn_weights.repeat(tgt_len, batch_size, 1)}
+        else:
+            kwargs = dict()
+        
         dec_out, dec_attn = self.model.decoder(
-            decoder_in, memory_bank, memory_lengths=memory_lengths, step=step, weights=self.rnn_weights
+            decoder_in, memory_bank, memory_lengths=memory_lengths, step=step,
+            **kwargs
         )
 
         # Generator forward.

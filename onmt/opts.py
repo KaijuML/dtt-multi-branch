@@ -663,7 +663,7 @@ def translate_opts(parser):
               help='Maximum prediction length.')
     group.add('--max_sent_length', '-max_sent_length', action=DeprecateAction,
               help="Deprecated, use `-max_length` instead")
-    group.add('--rnn_weights', '-rnn_weights', nargs='+', 
+    group.add('--rnn_weights', '-rnn_weights', nargs='+', type=float,
               help='When using multi branch decodeur, weights for each rnn. '
                   'The final weights will be normalized by the total sum')
 
