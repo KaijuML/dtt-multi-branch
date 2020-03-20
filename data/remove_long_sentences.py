@@ -68,7 +68,7 @@ def main(args):
                 if len(tokenizer.encode(tmp)) > args.max_size:
                     indices_to_remove.add(idx)
                 else:
-                    g.write(line + '\n')
+                    g.write(line.strip() + '\n')
                     
         print(f'\tFound {len(indices_to_remove)} sentences to remove')
                     
