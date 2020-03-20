@@ -663,6 +663,9 @@ def translate_opts(parser):
               help='Maximum prediction length.')
     group.add('--max_sent_length', '-max_sent_length', action=DeprecateAction,
               help="Deprecated, use `-max_length` instead")
+    group.add('--rnn_weights', '-rnn_weights', nargs='+', 
+              help='When using multi branch decodeur, weights for each rnn. '
+                  'The final weights will be normalized by the total sum')
 
     # Alpha and Beta values for Google Length + Coverage penalty
     # Described here: https://arxiv.org/pdf/1609.08144.pdf, Section 7

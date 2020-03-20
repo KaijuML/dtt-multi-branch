@@ -113,6 +113,7 @@ class Translator(object):
             max_length=100,
             ratio=0.,
             beam_size=30,
+            rnn_weights=None,
             random_sampling_topk=1,
             random_sampling_temp=1,
             stepwise_penalty=None,
@@ -152,7 +153,9 @@ class Translator(object):
         self.beam_size = beam_size
         self.random_sampling_temp = random_sampling_temp
         self.sample_from_topk = random_sampling_topk
-
+        
+        self.rnn_weights = rnn_weights
+        
         self.min_length = min_length
         self.ratio = ratio
         self.stepwise_penalty = stepwise_penalty
@@ -242,6 +245,7 @@ class Translator(object):
             max_length=opt.max_length,
             ratio=opt.ratio,
             beam_size=opt.beam_size,
+            rnn_weights=opt.rnn_weights,
             random_sampling_topk=opt.random_sampling_topk,
             random_sampling_temp=opt.random_sampling_temp,
             stepwise_penalty=opt.stepwise_penalty,
@@ -582,7 +586,7 @@ class Translator(object):
         # in case of inference tgt_len = 1, batch = beam times batch_size
         # in case of Gold Scoring tgt_len = actual length, batch = 1 batch
         dec_out, dec_attn = self.model.decoder(
-            decoder_in, memory_bank, memory_lengths=memory_lengths, step=step
+            decoder_in, memory_bank, memory_lengths=memory_lengths, step=step, weights=self.rnn_weights
         )
 
         # Generator forward.
