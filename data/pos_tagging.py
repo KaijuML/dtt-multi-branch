@@ -94,10 +94,9 @@ def do_train(folder, gpus):
     print(training_args)
 
     shell(f'{env_variables} python run_ner.py {training_args} --do_train')
-
-def do_tagging(pos_folder, wiki_folder, setnames, gpus):
-    """This will format the train/dev/test sets of wikibio 
-    so that we can run the PoS tagging network we have trained"""
+    
+    
+def run_script(examples, pos_folder, wiki_folder, setname, gpus):
     
     # This dict is used to map the weirdly formatted tokens of wikibio 
     # to tokens known to BERT
@@ -109,43 +108,65 @@ def do_tagging(pos_folder, wiki_folder, setnames, gpus):
         "''": '"',
     }
     
+    path = os.path.join(pos_folder, 'test.txt')
+    with open(path, mode='w', encoding='utf8') as f:
+        for example in examples:
+            for token in example.split():
+                f.write(f'{tok_mapping.get(token, token)}\n')
+            f.write('\n')
+            
+    cmd = " ".join([
+        f'CUDA_VISIBLE_DEVICES={gpus}',
+        'python run_ner.py',
+        f'--data_dir {pos_folder}/',
+        '--model_type bert',
+        f'--labels {os.path.join(pos_folder, "labels.txt")}',
+        '--model_name_or_path bert-base-uncased',
+        f'--output_dir {os.path.join(pos_folder, "trained")}',
+        '--max_seq_length 256',
+        '--do_predict',
+        '--per_gpu_eval_batch_size 64'
+    ])
+    shell(cmd)
+
+    
+    dest = os.path.join(wiki_folder, f'{setname}_pos.txt')
+    if not os.path.exists(dest):
+        with open(dest, mode="w", encoding='utf8') as f:
+            pass
+    
+    orig = os.path.join(pos_folder, 'trained', 'test_predictions.txt')
+    with open(dest, mode="a", encoding='utf8') as destfile, \
+            open(orig, mode="r", encoding='utf8') as origfile:
+        for line in origfile:
+            destfile.write(line.strip() + "\n")
+            
+    # removing cached data so that we can continue training on different examples
+    shell(f'rm {os.path.join(pos_folder, "cached_test_bert-base-uncased_256")}')
+
+def do_tagging(pos_folder, wiki_folder, setnames, gpus, split_size=int(5e4)):
+    """This will format the train/dev/test sets of wikibio 
+    so that we can run the PoS tagging network we have trained"""
+    
     for setname in setnames:
         assert setname in ['train', 'valid', 'test']
         print(f'Loading examples from {setname}')
         
         path = os.path.join(wiki_folder, f'{setname}_output.txt')
+        examples = list()
         with open(path, mode='r', encoding='utf8') as f:
-            examples = [line.strip() for line in f if line.strip()]
+            for line in f:
+                if not line.strip(): continue
+                examples.append(line.strip())
+                
+                if if split_size>0 and len(examples) >= split_size:
+                    run_script(examples, pos_folder, wiki_folder, setname, gpus)
+                    examples = list()
+                    
+        if examples:
+            run_script(examples, pos_folder, wiki_folder, setname, gpus)
+        print('Done.')
             
-        print('Formating examples (one token per line)')
-        
-        path = os.path.join(pos_folder, 'test.txt')
-        with open(path, mode='w', encoding='utf8') as f:
-            for example in examples:
-                for token in example.split():
-                    f.write(f'{tok_mapping.get(token, token)}\n')
-                f.write('\n')
-    
-        print('Starting prediction of Part of Speech')
-        cmd = " ".join([
-            f'CUDA_VISIBLE_DEVICES={gpus}',
-            'python run_ner.py',
-            f'--data_dir {pos_folder}/',
-            '--model_type bert',
-            f'--labels {os.path.join(pos_folder, "labels.txt")}',
-            '--model_name_or_path bert-base-uncased',
-            f'--output_dir {os.path.join(pos_folder, "trained")}',
-            '--max_seq_length 256',
-            '--do_predict',
-            '--per_gpu_eval_batch_size 64'
-        ])
-        shell(cmd)
-        
-        print('Moving prediction file to data/wikibio')
-        orig = os.path.join(pos_folder, 'trained', 'test_predictions.txt')
-        dest = os.path.join(wiki_folder, f'{setname}_pos.txt')
-        shell(f'cp {orig} {dest}')
-        shell(f'rm {os.path.join(pos_folder, "cached_test_bert-base-uncased_256")}')
 
 if __name__ == '__main__':
     
@@ -157,6 +178,8 @@ if __name__ == '__main__':
                              'Specify any combinason of [train, valid, test]')
     parser.add_argument('--gpus', dest='gpus', nargs="+", type=int, 
                         help='list of devices to train/predict on.')
+    parser.add_argument('--split_size', dest='split_size', type=int, default=5e4
+                        help='To be memory efficient, process this much line at once only.')
     
     args = parser.parse_args()
     
@@ -174,4 +197,4 @@ if __name__ == '__main__':
         do_train(pos_folder, gpus)
         
     if args.do_tagging:
-        do_tagging(pos_folder, wiki_folder, args.do_tagging, gpus)
+        do_tagging(pos_folder, wiki_folder, args.do_tagging, gpus, args.split_size)
