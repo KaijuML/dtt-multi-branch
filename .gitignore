@@ -1,6 +1,7 @@
 # custom
 experiments/
 data/wikibio/
+data/runs/
 data/pos
 *.ipynb
 
