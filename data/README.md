@@ -9,6 +9,9 @@ Scripts assume you are in the `data/` repository, with the following file:
 .
 ├── format_wikibio.py
 ├── pos_tagging.py        
+├── remove_long_sentences.py        
+├── run_ner.py        
+├── utils_ner.py        
 ```
 
 ## WikiBIO download and basic formating
@@ -33,14 +36,37 @@ create the dataset:
 python format_wikibio.py
 ```
 
+The whole OpenNMT-ready dataset can now be found in `wikibio/full`:
+```
+.
+└── wikibio/
+│   ├── raw/
+│   ├── process_data/
+│   └── full/
+├── format_wikibio.py
+├── pos_tagging.py        
+├── remove_long_sentences.py        
+├── run_ner.py        
+├── utils_ner.py        
+```
+
+However, in this work with rely on Part-of-Speech tagging, using a BERT model fine-tuned using hugginface/transformers [ner script](https://github.com/huggingface/transformers/tree/master/examples/ner), which requires a max length setting. Manual exploration showed that the minimum size which will keep all testset examples is 256.
+
+You can trim the few (approx 13 examples in train+valid) remaining sentences using (for now, only BERT-based model are supported):
+
+```
+python remove_long_sentences --max_size 256 --model bert-base-uncased
+```
+
+
 ## WikiBIO Part-of-Speech tagging
 
 We use huggingface/transformers to train a PoS-tagger on [UniversalDependencies english treebank](https://github.com/UniversalDependencies/UD_English-ParTUT)
 
-In order to do this, you will need the following libraries: `pip install transformers pyconll`
+In order to do this, you will need the following libraries: `pip install transformers pyconll seqeval tensorboardX`
 
 To train the model and tag wikibio train/valid/test sets:
 
 ```
-python pos_tagging.py --do_train --do-tagging train valid test
+python pos_tagging.py --do_train --do-tagging train valid test --gpus 0 1
 ```
