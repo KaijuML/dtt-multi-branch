@@ -108,7 +108,7 @@ class TransformerDecoderLayer(nn.Module):
         return output, top_attn, attn_align
 
     def _forward(self, inputs, memory_bank, src_pad_mask, tgt_pad_mask,
-                 layer_cache=None, step=None, future=False):
+                 layer_cache=None, step=None, future=False, **kwargs):
         """ A naive forward pass for transformer decoder.
 
         # T: could be 1 in the case of stepwise decoding or tgt_len
