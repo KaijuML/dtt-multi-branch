@@ -95,7 +95,7 @@ def do_train(folder, gpus):
 
     shell(f'{env_variables} python run_ner.py {training_args} --do_train')
 
-def do_tagging(pos_folder, wiki_folder, fullwiki_folder, setnames, gpus):
+def do_tagging(pos_folder, wiki_folder, setnames, gpus):
     """This will format the train/dev/test sets of wikibio 
     so that we can run the PoS tagging network we have trained"""
     
@@ -113,7 +113,7 @@ def do_tagging(pos_folder, wiki_folder, fullwiki_folder, setnames, gpus):
         assert setname in ['train', 'valid', 'test']
         print(f'Loading examples from {setname}')
         
-        path = os.path.join(fullwiki_folder, '{setname}_output.txt')
+        path = os.path.join(wiki_folder, f'{setname}_output.txt')
         with open(path, mode='r', encoding='utf8') as f:
             examples = [line.strip() for line in f if line.strip()]
             
@@ -142,7 +142,7 @@ def do_tagging(pos_folder, wiki_folder, fullwiki_folder, setnames, gpus):
         shell(cmd)
         
         print('Moving prediction file to data/wikibio')
-        orig = os.path.join(pos_folder, 'trainder', 'test_predictions.txt')
+        orig = os.path.join(pos_folder, 'trainded', 'test_predictions.txt')
         dest = os.path.join(wiki_folder, f'{setname}_pos.txt')
         shell(f'cp {orig} {dest}')
         shell(f'rm {os.path.join(pos_folder, "cached_test_bert-base-uncased_256")}')
@@ -162,8 +162,6 @@ if __name__ == '__main__':
     
     pos_folder = pkg_resources.resource_filename(__name__, 'pos')
     wiki_folder = pkg_resources.resource_filename(__name__, 'wikibio')
-    fullwiki_folder = os.path.join('wikibio', 'full')
-    fullwiki_folder = pkg_resources.resource_filename(__name__, fullwiki_folder)
     
     gpus = ','.join(map(str, args.gpus))
     if not gpus:
@@ -176,4 +174,4 @@ if __name__ == '__main__':
         do_train(pos_folder, gpus)
         
     if args.do_tagging:
-        do_tagging(pos_folder, wiki_folder, fullwiki_folder, args.do_tagging, gpus)
+        do_tagging(pos_folder, wiki_folder, args.do_tagging, gpus)
