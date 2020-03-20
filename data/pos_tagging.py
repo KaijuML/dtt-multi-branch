@@ -142,7 +142,7 @@ def do_tagging(pos_folder, wiki_folder, setnames, gpus):
         shell(cmd)
         
         print('Moving prediction file to data/wikibio')
-        orig = os.path.join(pos_folder, 'trainded', 'test_predictions.txt')
+        orig = os.path.join(pos_folder, 'trained', 'test_predictions.txt')
         dest = os.path.join(wiki_folder, f'{setname}_pos.txt')
         shell(f'cp {orig} {dest}')
         shell(f'rm {os.path.join(pos_folder, "cached_test_bert-base-uncased_256")}')
