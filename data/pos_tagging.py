@@ -178,7 +178,7 @@ if __name__ == '__main__':
                              'Specify any combinason of [train, valid, test]')
     parser.add_argument('--gpus', dest='gpus', nargs="+", type=int, 
                         help='list of devices to train/predict on.')
-    parser.add_argument('--split_size', dest='split_size', type=int, default=5e4
+    parser.add_argument('--split_size', dest='split_size', type=int, default=5e4,
                         help='To be memory efficient, process this much line at once only.')
     
     args = parser.parse_args()
