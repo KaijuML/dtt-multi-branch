@@ -10,6 +10,24 @@ During inference, weights are fixed to only use RNNs which where associated to n
 
 For all dataset related operations, please refer to `data/README.md`
 
+You can download a file where each token has been scored, and examples are separated by empty lines
+
+`
+wget https://datacloud.di.unito.it/index.php/s/zWs2MTzB6Bxfksw/download
+mv download data/
+`
+
+This file can be processed into onmt-readable file with:
+
+`python data/format_weights.py --orig download --dest train_weights.txt`
+
+
+Note that for now, the `preprocess.cfg` is setup to find a small version of the dataset, which can be created with the following script:
+
+`python data/truncate_wikibio.py --folder small --max_size 1e4 --setname train test`
+
+
+
 # Training
 
 First things first, we compartimentalize experiments.
@@ -21,9 +39,6 @@ Training needs a preprocessing step:
 
 `python run_onmt.py --preprocess --config preprocess.cfg`
 
-Note that for now, the `preprocess.cfg` is setup to find a small version of the dataset, which can be created with the following script:
-
-`python data/truncate_wikibio.py --folder small --max_size 1e4 --setname train test`
 
 Now that the preprocessing step is done, we can train a model using:
 
