@@ -6,6 +6,10 @@ During training, weights are conditionned based on the probability of the target
 
 During inference, weights are fixed to only use RNNs which where associated to non-diverging tokens during training.
 
+To work work with OpenNMT-py, you will need the following libraries:
+
+`pip install torch torchtext configargpase`
+
 # Dataset: download & format
 
 For all dataset related operations, please refer to `data/README.md`
