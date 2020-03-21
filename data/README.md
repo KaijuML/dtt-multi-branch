@@ -55,7 +55,7 @@ However, in this work with rely on Part-of-Speech tagging, using a BERT model fi
 You can trim the few (approx 13 examples in train+valid) remaining sentences using (for now, only BERT-based model are supported):
 
 ```
-python remove_long_sentences --max_size 256 --model bert-base-uncased
+python remove_long_sentences.py --max_size 256 --model bert-base-uncased
 ```
 
 
