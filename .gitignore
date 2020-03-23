@@ -3,7 +3,9 @@ experiments/
 data/wikibio/
 data/runs/
 data/pos
+data/deprel
 *.ipynb
+.idea
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

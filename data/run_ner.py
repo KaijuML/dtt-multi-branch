@@ -24,6 +24,7 @@ import random
 
 import numpy as np
 import torch
+from deprel_bert import BertForDependencyRelations
 from seqeval.metrics import f1_score, precision_score, recall_score
 from torch.nn import CrossEntropyLoss
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, TensorDataset
@@ -71,6 +72,7 @@ ALL_MODELS = sum(
 
 MODEL_CLASSES = {
     "bert": (BertConfig, BertForTokenClassification, BertTokenizer),
+    "bert_deprel": (BertConfig, BertForDependencyRelations, BertTokenizer),
     "roberta": (RobertaConfig, RobertaForTokenClassification, RobertaTokenizer),
     "distilbert": (DistilBertConfig, DistilBertForTokenClassification, DistilBertTokenizer),
     "camembert": (CamembertConfig, CamembertForTokenClassification, CamembertTokenizer),
