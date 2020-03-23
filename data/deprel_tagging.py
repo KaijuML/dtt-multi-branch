@@ -70,10 +70,7 @@ def do_train(folder, gpus):
     if not os.path.exists(label_file):
         print('Extracting unique labels in labels.txt')
         shell(f'cat {file["train"]} | cut -d " " -f 2 | grep -v "^$"| sort | uniq > {label_file}')
-    # TODO
-    print('BASTA COSÌ!')
-    exit()
-    # TODO
+
     env_variables = {
         'CUDA_VISIBLE_DEVICES': gpus
     }
