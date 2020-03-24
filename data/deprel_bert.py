@@ -91,7 +91,7 @@ class BertForDependencyRelations(BertForTokenClassification):
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
 
-        outputs = (logits, dependencies) + outputs[2:]  # add hidden states and attention if they are here
+        outputs = ([logits, dependencies],) + outputs[2:]  # add hidden states and attention if they are here
         if labels is not None:
             loss_fct = CrossEntropyLoss()
             labels_tags, labels_dep = labels.chunk(2, dim=-1)
