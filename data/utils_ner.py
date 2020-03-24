@@ -50,7 +50,7 @@ class InputFeatures(object):
         self.label_ids = label_ids
 
 
-def read_examples_from_file(data_dir, mode):
+def read_examples_from_file(data_dir, mode, label_size=1):
     file_path = os.path.join(data_dir, "{}.txt".format(mode))
     guid_index = 1
     examples = []
@@ -73,7 +73,7 @@ def read_examples_from_file(data_dir, mode):
                     labels.append(tuple(lbl.replace("\n", "") for lbl in splits[1:]))
                 else:
                     # Examples could have no label for mode = "test"
-                    labels.append("O")
+                    labels.append(["O"] * label_size)
         if words:
             examples.append(InputExample(guid="{}-{}".format(mode, guid_index), words=words, labels=labels))
     return examples
