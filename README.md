@@ -36,7 +36,7 @@ Note that for now, the `preprocess.cfg` is setup to find a small version of the 
 
 First things first, we compartimentalize experiments.
 
-`python create_experiment.py --dataset wikibio --name small`
+`python create-experiment.py --dataset wikibio --name small`
 
 We use the OpenNMT-py framework for training, included in `onmt/`. Our model has been added to our version of the repo.
 Training needs a preprocessing step:
