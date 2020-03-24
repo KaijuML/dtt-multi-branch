@@ -27,11 +27,12 @@ def read_conllu(path):
     t = 0
     for sentence in data:
         tagged_sentence = []
-        for token in sentence:
+        for i, token in enumerate(sentence):
             if token.deprel and token.form:
                 t += 1
                 deprel = token.deprel.split(':')[0]
-                tagged_sentence.append((token.form.lower(), deprel, token.head))
+                head = i if deprel == 'root' else token.head - 1
+                tagged_sentence.append((token.form.lower(), deprel, head))
         tagged_sentences.append(tagged_sentence)
     return tagged_sentences
 
