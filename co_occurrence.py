@@ -25,8 +25,6 @@ num_examples = int(os.popen(f'wc -l < {path.join(data_folder, f"{subset}_tables.
 num_words = int(os.popen(f'wc -l < {path.join(data_folder, f"{subset}_pos.txt")}').read())
 
 interesting_tags = ['NOUN', 'ADJ', 'NUM', 'PROPN']
-min_cnt = 100
-most_common_cnt = 10
 
 nlp = None
 
@@ -63,29 +61,43 @@ def expand(token, h):
     ancestor = ascend_dependency_tree(token)
     if ancestor:
         for t in ancestor.subtree:
-            if not h[t.i]:
-                h[t.i] += 1
+            if t.pos_ in interesting_tags:
+                h[t.i] = h[t.i] * h[token.i]
+            else:
+                h[t.i] = max(h[t.i], h[token.i])
 
 
-def get_allowed_words(table, co_occur):
+def build_scores(table, co_occur):
     """
-    Returns: the set of key, values and (key, value) common co-occurrences
+
+    Args:
+        table: The input table as list([str, list(str)])
+        co_occur: The general co_occurrence score dictionary
+
+    Returns: The table's token hallucination inverse score dictionary
+
     """
     # [[<key_0>, [<token_00>, ..., <token_0m>]], ..., [<key_n>, [<token_n0>, ..., <token_nm>]]]
     table = json.loads(table)
-    # {<token_00>, ..., <token_nm>}
-    allowed_words = set(sum([[key_val[0]] + key_val[1] for key_val in table], []))
+    # {<key_0>, <token_00>, ..., <token_0m>, <key_1>, ..., <token_nm>}
+    tokens_in_table = set(sum([[key_val[0]] + key_val[1] for key_val in table], []))
 
-    # allowed_words now contains all the table keys and values
+    # scores assigns 1 to all the table keys and values
+    scores = {t: 1 for t in tokens_in_table}
 
-    # [(<key_0>, "<token_00> ... <token_0m>"), ..., (<key_n>, "<token_n0> ... <token_nm>")]
-    keys = []
-    for key_val in table:
-        keys += [(key_val[0], val) for val in key_val[1]]
+    # scores assigns a proper value to the table rows' co-occurrences
+    for row in table:
+        table_key = row[0]
+        for table_value in row[1]:
+            table_tuple = (table_key, table_value)
+            for token, score in co_occur.get(table_tuple, {}).items():
+                scores[token] = max(score, scores.get(token, 0))
+    return scores
 
-    allowed_words = allowed_words.union(*[co_occur[k] for k in keys])  # Set of all table values + most f
-    # allowed_words now contains all the table values + most common co-occurrences
-    return allowed_words
+
+def hallucination_inv_score(cnt, max_cnt):
+    a = 1 / (max_cnt - 5) ** 2
+    return min(max(a * cnt ** 2 - 10 * a * cnt + 25 * a, 0), 1)
 
 
 def handle_sentence_punctuation(sentence, h):
@@ -94,30 +106,26 @@ def handle_sentence_punctuation(sentence, h):
     """
     for token in sentence:
         # Conjunctions and comma near hallucinations are hallucinated
-        if (token.dep_ == 'cc' or token.text == ',') \
-                and not h[token.i] \
-                and ((token.i != 0 and h[token.i - 1]) or (token.i != len(sentence) - 1 and h[token.i + 1])):
-            h[token.i] += 1
+        if token.i > 0 and (token.dep_ == 'cc' or token.text == ','):
+            h[token.i] = max(h[token.i - 1:token.i + 2])
             # ", and" is hallucinated as a whole
             if token.dep_ == 'cc' and sentence[token.i - 1].text == ',':
-                h[token.i - 1] += 1
+                h[token.i - 1] = h[token.i]
         # Brackets/quotes containing hallucinations only are hallucinated
         if (token.is_bracket or token.is_quote) and token.is_left_punct:
             j = 0
+            min_h = 1
             for i_par, token_par in enumerate(sentence[token.i + 1:], start=token.i + 1):
-                if (token.is_bracket and token_par.is_bracket and token_par.is_right_punct) or \
-                        (token.is_quote and token_par.is_quote and token_par.is_right_punct):
+                if token_par.is_right_punct and (
+                        (token.is_bracket and token_par.is_bracket) or (token.is_quote and token_par.is_quote)
+                ):
                     j = i_par
                     break
-                if not h[i_par]:
-                    break
+                else:
+                    min_h = min(min_h, h[i_par])
             if j:
-                h[token.i] += 1
-                h[j] += 1
-
-
-def is_hallucinated(token, allowed_words):
-    return token.pos_ in interesting_tags and not any(token.text in w for w in allowed_words)
+                h[token.i] = min_h
+                h[j] = min_h
 
 
 def read_sentence(refs_file):
@@ -161,14 +169,17 @@ def main():
 
     #
     # STEP 2
-    # Extract the most common tokens for every table element
-    # i.e. filter co_occur according to min_cnt and most_common_cnt
+    # Keep only elements whose total co_occurrences number is in the 5th percentile
+    # Convert counts to scores
     #
-    for k in tqdm(co_occur.keys(), desc='Extracting common co-occurrences'):
-        if sum(co_occur[k].values()) > min_cnt:
-            co_occur[k] = set(dict(co_occur[k].most_common(most_common_cnt)).keys())
+    keys = list(co_occur.keys())
+    keys.sort(key=lambda key: max(co_occur[key].values()) if len(co_occur[key]) else 0, reverse=True)
+    for i, k in tqdm(enumerate(keys), desc='Extracting common co-occurrences', total=len(keys)):
+        if i / len(keys) < 0.05:
+            max_cnt = max(co_occur[k].values())
+            co_occur[k] = {t: hallucination_inv_score(c, max_cnt) for t, c in co_occur[k].items() if c > 5}
         else:
-            co_occur[k] = set()
+            del co_occur[k]
 
     #
     # STEP 3
@@ -176,14 +187,18 @@ def main():
     #
     with open(tables_filename) as tables_file, open(hallucination_filename, 'w') as hallucination_file:
         for i, table in tqdm(enumerate(tables_file), desc='Scoring tokens', total=num_examples):
-            allowed_words = get_allowed_words(table, co_occur)
+            scores = build_scores(table, co_occur)
             sentence = build_sentence_object(references[i])
-            h = [0 for _ in range(len(sentence))]
+            h = [int(token.pos_ in interesting_tags) for token in sentence]
 
-            # Score each token and expand the hallucination score if necessary
+            # Score each token
             for token in sentence:
-                if is_hallucinated(token, allowed_words):
-                    h[token.i] += 2
+                if h[token.i]:
+                    h[token.i] -= scores.get(token.text, 0)
+
+            # expand the hallucination scores
+            for token in sentence:
+                if token.pos_ in interesting_tags and h[token.i] > 0:
                     expand(token, h)
 
             # Some tricks to harmonize the scoring
