@@ -31,7 +31,7 @@ def read_conllu(path):
             if token.deprel and token.form:
                 t += 1
                 deprel = token.deprel.split(':')[0]
-                head = i if deprel == 'root' else token.head - 1
+                head = str(i if deprel == 'root' else int(token.head) - 1)
                 tagged_sentence.append((token.form.lower(), deprel, head))
         tagged_sentences.append(tagged_sentence)
     return tagged_sentences
