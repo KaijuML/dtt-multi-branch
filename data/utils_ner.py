@@ -73,7 +73,7 @@ def read_examples_from_file(data_dir, mode, label_size=1):
                     labels.append(tuple(lbl.replace("\n", "") for lbl in splits[1:]))
                 else:
                     # Examples could have no label for mode = "test"
-                    labels.append(["O"] * label_size)
+                    labels.append(("O",) * label_size)
         if words:
             examples.append(InputExample(guid="{}-{}".format(mode, guid_index), words=words, labels=labels))
     return examples
