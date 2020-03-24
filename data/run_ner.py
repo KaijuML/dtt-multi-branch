@@ -370,7 +370,7 @@ def load_and_cache_examples(args, tokenizer, labels, pad_token_label_id, mode):
         features = torch.load(cached_features_file)
     else:
         logger.info("Creating features from dataset file at %s", args.data_dir)
-        examples = read_examples_from_file(args.data_dir, mode)
+        examples = read_examples_from_file(args.data_dir, mode, label_size=args.label_size)
         features = convert_examples_to_features(
             examples,
             labels,
@@ -467,6 +467,12 @@ def main():
         type=int,
         help="The maximum total input sequence length after tokenization. Sequences longer "
         "than this will be truncated, sequences shorter will be padded.",
+    )
+    parser.add_argument(
+        "--label_size",
+        default=1,
+        type=int,
+        help="The number of outputs associated to each input. Useful for Dependency Relations.",
     )
     parser.add_argument("--do_train", action="store_true", help="Whether to run training.")
     parser.add_argument("--do_eval", action="store_true", help="Whether to run eval on the dev set.")

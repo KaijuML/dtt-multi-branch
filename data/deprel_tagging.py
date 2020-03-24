@@ -89,7 +89,8 @@ def do_train(folder, gpus):
         'num_train_epochs': '5',
         'per_gpu_train_batch_size': '32',
         'save_steps': '750',
-        'logging_steps': '56'
+        'logging_steps': '56',
+        'label_size': '2'
     }
 
     training_args = ' '.join([f'--{key} {value}' for key, value in training_args.items()])
@@ -127,7 +128,8 @@ def run_script(examples, deprel_folder, wiki_folder, setname, gpus):
         f'--output_dir {os.path.join(deprel_folder, "trained")}',
         '--max_seq_length 256',
         '--do_predict',
-        '--per_gpu_eval_batch_size 64'
+        '--per_gpu_eval_batch_size 64',
+        '--label_size 2'
     ])
     shell(cmd)
 
