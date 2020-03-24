@@ -24,6 +24,7 @@ import random
 
 import numpy as np
 import torch
+from deprel_bert import BertForDependencyRelations
 from seqeval.metrics import f1_score, precision_score, recall_score
 from torch.nn import CrossEntropyLoss
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, TensorDataset
@@ -71,6 +72,7 @@ ALL_MODELS = sum(
 
 MODEL_CLASSES = {
     "bert": (BertConfig, BertForTokenClassification, BertTokenizer),
+    "bert_deprel": (BertConfig, BertForDependencyRelations, BertTokenizer),
     "roberta": (RobertaConfig, RobertaForTokenClassification, RobertaTokenizer),
     "distilbert": (DistilBertConfig, DistilBertForTokenClassification, DistilBertTokenizer),
     "camembert": (CamembertConfig, CamembertForTokenClassification, CamembertTokenizer),
@@ -230,7 +232,11 @@ def train(args, train_dataset, model, tokenizer, labels, pad_token_label_id):
                     ):  # Only evaluate when single GPU otherwise metrics may not average well
                         results, _ = evaluate(args, model, tokenizer, labels, pad_token_label_id, mode="dev")
                         for key, value in results.items():
-                            tb_writer.add_scalar("eval_{}".format(key), value, global_step)
+                            if type(value) is list:
+                                for i_val, val in enumerate(value):
+                                    tb_writer.add_scalar(f"eval_{key}_{i_val}", val, global_step)
+                            else:
+                                tb_writer.add_scalar(f"eval_{key}", value, global_step)
                     tb_writer.add_scalar("lr", scheduler.get_lr()[0], global_step)
                     tb_writer.add_scalar("loss", (tr_loss - logging_loss) / args.logging_steps, global_step)
                     logging_loss = tr_loss
@@ -304,32 +310,41 @@ def evaluate(args, model, tokenizer, labels, pad_token_label_id, mode, prefix=""
 
             eval_loss += tmp_eval_loss.item()
         nb_eval_steps += 1
+        if type(logits) is not list:
+            logits = (logits,)
         if preds is None:
-            preds = logits.detach().cpu().numpy()
-            out_label_ids = inputs["labels"].detach().cpu().numpy()
+            preds = [o.detach().cpu().numpy() for o in logits]
+            out_label_ids_joined = inputs["labels"].detach().cpu().numpy()
+            out_label_ids = np.split(out_label_ids_joined, len(preds), -1)
         else:
-            preds = np.append(preds, logits.detach().cpu().numpy(), axis=0)
-            out_label_ids = np.append(out_label_ids, inputs["labels"].detach().cpu().numpy(), axis=0)
+            preds = [np.append(preds[i], logits[i].detach().cpu().numpy(), axis=0) for i in range(len(preds))]
+            out_label_ids_joined = inputs["labels"].detach().cpu().numpy()
+            out_label_ids_split = np.split(out_label_ids_joined, len(preds), -1)
+            out_label_ids = [np.append(out_label_ids[i], out_label_ids_split[i], axis=0) for i in range(len(preds))]
 
     eval_loss = eval_loss / nb_eval_steps
-    preds = np.argmax(preds, axis=2)
+    preds = [np.argmax(p, axis=2) for p in preds]
+    test_size = preds[0].shape[0]
 
     label_map = {i: label for i, label in enumerate(labels)}
 
-    out_label_list = [[] for _ in range(out_label_ids.shape[0])]
-    preds_list = [[] for _ in range(out_label_ids.shape[0])]
+    out_label_list = [[[] for _ in range(test_size)] for _ in range(len(preds))]
+    preds_list = [[[] for _ in range(test_size)] for _ in range(len(preds))]
 
-    for i in range(out_label_ids.shape[0]):
-        for j in range(out_label_ids.shape[1]):
-            if out_label_ids[i, j] != pad_token_label_id:
-                out_label_list[i].append(label_map[out_label_ids[i][j]])
-                preds_list[i].append(label_map[preds[i][j]])
+    for i in range(test_size):
+        for j in range(args.max_seq_length):
+            for p in range(len(preds)):
+                if out_label_ids[p][i, j] != pad_token_label_id:
+                    out_label_id = out_label_ids[p][i][j].item()
+                    pred = preds[p][i][j].item()
+                    out_label_list[p][i].append(label_map[out_label_id] if p == 0 else str(out_label_id))
+                    preds_list[p][i].append(label_map[pred] if p == 0 else str(pred))
 
     results = {
         "loss": eval_loss,
-        "precision": precision_score(out_label_list, preds_list),
-        "recall": recall_score(out_label_list, preds_list),
-        "f1": f1_score(out_label_list, preds_list),
+        "precision": [precision_score(out_label_list[p], preds_list[p]) for p in range(len(preds))],
+        "recall": [recall_score(out_label_list[p], preds_list[p]) for p in range(len(preds))],
+        "f1": [f1_score(out_label_list[p], preds_list[p]) for p in range(len(preds))],
     }
 
     logger.info("***** Eval results %s *****", prefix)
