@@ -38,7 +38,7 @@ def main(folder, most_common_cnt, min_cnt):
             sentence, sent_interesting_tokens = read_sentence(refs_file)
             table = json.loads(tables_file.readline())
 
-            # counting all co-occurences in this examples
+            # counting all co-occurrences in this examples
             for key, values in table:
                 table_items = [(key, val) for val in values]
                 for table_item in table_items:
@@ -47,11 +47,11 @@ def main(folder, most_common_cnt, min_cnt):
 
     co_occur = {
         ' '.join(key): dict(counter.most_common(most_common_cnt))
-        for key, counter in tqdm(co_occur.items(), total=len(co_occur), desc='Filtering co-occurences')
+        for key, counter in tqdm(co_occur.items(), total=len(co_occur), desc='Filtering co-occurrences')
         if sum(counter.values()) > min_cnt
     }
     
-    cooc_filename = os.path.join(folder, 'occurences.json')
+    cooc_filename = os.path.join(folder, 'occurrences.json')
     with open(cooc_filename, mode="w", encoding='utf8') as f:
         json.dump(co_occur, f)
 
@@ -64,7 +64,7 @@ if __name__ == '__main__':
     parser.add_argument('--most_common_cnt', dest='most_common_cnt', type=int,
                         help='Number of tokens to keep for each table value')
     parser.add_argument('--min_cnt', dest='min_cnt', type=int,
-                        help='Only keep a table value if it has at least min_cnt co-occurences')
+                        help='Only keep a table value if it has at least min_cnt co-occurrences')
     
     args = parser.parse_args()
     
