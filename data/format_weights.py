@@ -1,34 +1,50 @@
+from tqdm import tqdm
+
 import pkg_resources
 import argparse
 import os
 
 
-
-def binary_format(orig):
+def _count_examples(path):
     """
-    We add a final score for </s> token
+    In PoS/Score tagged files, it's one token per line,
+    examples separated by empty line.
     """
-    for example in read_tagged_file(orig):
-        scores = [[1, 0] if score=='0' else [0, 1] for _, score in example] + [[1, 1]]
-        yield ' '.join([f'{a}:{b}' for a, b in scores])
-
-strategies = {
-    'binary': binary_format
-}
+    nlines = 0
+    with open(path, mode='r', encoding='utf8') as f:
+        for line in f: 
+            if not line.strip(): nlines += 1
+    return nlines
 
 
 def read_tagged_file(path):
-    sentences = list()
+    """
+    Accumulate lines until empty line, then yield and do it again
+    """
     sentence = list()
     with open(path, mode='r', encoding='utf8') as f:
         for line in f:
             if line.strip():
                 sentence.append(line.strip().split())
             else:
-                sentences.append(sentence)
+                yield sentence
                 sentence = list()
-    if sentence: sentences.append(sentence)  # deal with no empty last line
-    return sentences
+    if sentence: 
+        yield sentence
+
+
+def binary_format(example):
+    """
+    Tokens are either hallucinated or they're not.
+    We add a final score for </s> token
+    """
+    scores = [[1, 0] if score=='0' else [0, 1] for _, score in example] + [[1, 1]]
+    return ' '.join([f'{a}:{b}' for a, b in scores])
+
+
+strategies = {
+    'binary': binary_format
+}
 
 
 if __name__ == '__main__':
@@ -50,8 +66,11 @@ if __name__ == '__main__':
     dest = os.path.join(folder, args.dest)
     
     assert os.path.exists(orig), f'{orig} is not a valid path!' 
+    nlines = _count_examples(orig)
 
     format_func = strategies[args.strategy]
     with open(dest, mode="w", encoding="utf8") as f:
-        for example in format_func(orig):
-            f.write(example + '\n')
+        for example in tqdm(read_tagged_file(orig), 
+                            total=nlines,
+                            desc='formating weights:'):
+            f.write(format_func(example) + '\n')

@@ -7,15 +7,31 @@ def truncate_wikibio_files(orig, dest, setname, length=10):
     assert setname in ['train', 'valid', 'test']
     assert int(length) == length and length > 0  # check positiv int
     
-    for suffix in ['input', 'output', 'weights']:
-        origpath = os.path.join(orig, f'{setname}_{suffix}.txt')
-        destpath = os.path.join(dest, f'{setname}_{suffix}.txt')
+    # files with 1 example per line
+    for suffix in ['input.txt', 'output.txt', 'tables.jl']:
+        origpath = os.path.join(orig, f'{setname}_{suffix}')
+        destpath = os.path.join(dest, f'{setname}_{suffix}')
         with open(origpath, mode="r", encoding='utf8') as f, \
                 open(destpath, mode="w", encoding='utf8') as g:
             for idx, line in enumerate(f):
                 if idx >= length:
                     break
                 g.write(line)
+                
+    # files with one token per line
+    for suffix in ['pos.txt']:
+        origpath = os.path.join(orig, f'{setname}_{suffix}')
+        destpath = os.path.join(dest, f'{setname}_{suffix}')
+        with open(origpath, mode="r", encoding='utf8') as f, \
+                open(destpath, mode="w", encoding='utf8') as g:
+            nline = 0
+            for tokens in f:
+                if tokens.strip():
+                    g.write(tokens.strip() + '\n')
+                else:
+                    g.write('\n')
+                    nline += 1
+                    if nline >= length: break
 
 
 if __name__ == '__main__':
