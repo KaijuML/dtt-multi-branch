@@ -163,7 +163,7 @@ class Trainer(object):
     def load_weights_file(path):
         with open(path, mode="r", encoding="utf8") as f:
             return [
-                torch.Tensor([list(map(int, s.split(':'))) for s in line.split()])
+                torch.Tensor([list(map(float, s.split(':'))) for s in line.split()])
                 for line in f
             ]
 
