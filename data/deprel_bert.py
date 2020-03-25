@@ -3,6 +3,8 @@ from torch import nn
 from torch.nn import CrossEntropyLoss
 from transformers import BertModel, BertForTokenClassification
 
+from data.biaffine import DeepBiaffineScorer
+
 
 class LogitsSelfAttention(nn.Module):
     def __init__(self, config):
@@ -57,7 +59,7 @@ class BertForDependencyRelations(BertForTokenClassification):
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         # For relations
-        self.attention = LogitsSelfAttention(config)
+        self.attention = DeepBiaffineScorer(config.hidden_size, config.hidden_size, 1)
 
         self.init_weights()
 
