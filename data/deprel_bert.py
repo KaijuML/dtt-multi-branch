@@ -1,5 +1,3 @@
-import math
-
 import torch
 from torch import nn
 from torch.nn import CrossEntropyLoss
@@ -37,10 +35,10 @@ class LogitsSelfAttention(nn.Module):
 
         # Take the dot product between "query" and "key" to get the raw attention scores.
         attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
-        attention_scores = attention_scores / math.sqrt(self.attention_head_size)
         if attention_mask is not None:
+            dep_mask = -10000 * (1 - attention_mask).unsqueeze(1).unsqueeze(1)
             # Apply the attention mask is (precomputed for all layers in BertModel forward() function)
-            attention_scores = attention_scores + attention_mask
+            attention_scores = attention_scores + dep_mask
 
         attention_scores = attention_scores.permute(0, 2, 3, 1)
         attention_scores = self.to_single_head(attention_scores).squeeze()
@@ -85,7 +83,7 @@ class BertForDependencyRelations(BertForTokenClassification):
         sequence_output = outputs[0]
 
         # Dependency relations
-        dependencies = self.attention(sequence_output)
+        dependencies = self.attention(sequence_output, attention_mask)
 
         # Relations' tags
         sequence_output = self.dropout(sequence_output)
