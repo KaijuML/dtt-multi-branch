@@ -3,7 +3,7 @@ from torch import nn
 from torch.nn import CrossEntropyLoss
 from transformers import BertModel, BertForTokenClassification
 
-from data.biaffine import DeepBiaffineScorer
+from biaffine import DeepBiaffineScorer
 
 
 class LogitsSelfAttention(nn.Module):
@@ -85,7 +85,7 @@ class BertForDependencyRelations(BertForTokenClassification):
         sequence_output = outputs[0]
 
         # Dependency relations
-        dependencies = self.attention(sequence_output, attention_mask)
+        dependencies = self.attention(sequence_output)
 
         # Relations' tags
         sequence_output = self.dropout(sequence_output)
