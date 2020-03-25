@@ -23,7 +23,7 @@ mv download data/
 
 This file can be processed into onmt-readable file with:
 
-`python data/format_weights.py --orig download --dest train_weights.txt`
+`python data/format_weights.py --orig download --dest train_weights.txt --strategy binary --normalize --weight_regularization 1`
 
 
 Note that for now, the `preprocess.cfg` is setup to find a small version of the dataset, which can be created with the following script:
