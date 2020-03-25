@@ -66,9 +66,8 @@ class Strategy:
         raise NotImplementedError
 
     def score_weight(self, w):
-        if self.weight_regularization > 0:
-            s = [self.weight_regularization]
-            s.extend(self._score_weight(w))
+        s = [self.weight_regularization] if self.weight_regularization > 0 else list()
+        s.extend(self._score_weight(w))
         if self.normalize:
             tot_s = sum(s)
             s = [_w/tot_s for _w in s]
@@ -88,8 +87,25 @@ class BinaryStrategy(Strategy):
         return [1, 0] if w=='0' else [0, 1]
 
 
+class OneBranchStrategy(Strategy):
+    @overrides
+    def __init__(self, eos_weights, normalize, weight_regularization):
+        super().__init__(eos_weights, normalize, weight_regularization)
+        if not self.eos_weights == [1]:
+            raise ValueError('OneBranch strategy should have only one branch, '
+                             'and predict </s> with weight 1. '
+                             f'Instead, got {self.eos_weights} for </s> prediction.')
+        if not self.weight_regularization == 0:
+            raise ValueError('OneBranch strategy do not have a regularization branch!')
+
+    @overrides
+    def _score_weight(self, w):
+        return [1]
+
+
 strategies = {
-    'binary': BinaryStrategy
+    'binary': BinaryStrategy,
+    'one_branch': OneBranchStrategy,
 }
 
 
