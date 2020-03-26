@@ -1,9 +1,9 @@
-import math
-
 import torch
 from torch import nn
 from torch.nn import CrossEntropyLoss
 from transformers import BertModel, BertForTokenClassification
+
+from biaffine import DeepBiaffineScorer
 
 
 class LogitsSelfAttention(nn.Module):
@@ -37,10 +37,10 @@ class LogitsSelfAttention(nn.Module):
 
         # Take the dot product between "query" and "key" to get the raw attention scores.
         attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
-        attention_scores = attention_scores / math.sqrt(self.attention_head_size)
         if attention_mask is not None:
+            dep_mask = -10000 * (1 - attention_mask).unsqueeze(1).unsqueeze(1)
             # Apply the attention mask is (precomputed for all layers in BertModel forward() function)
-            attention_scores = attention_scores + attention_mask
+            attention_scores = attention_scores + dep_mask
 
         attention_scores = attention_scores.permute(0, 2, 3, 1)
         attention_scores = self.to_single_head(attention_scores).squeeze()
@@ -59,7 +59,7 @@ class BertForDependencyRelations(BertForTokenClassification):
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         # For relations
-        self.attention = LogitsSelfAttention(config)
+        self.attention = DeepBiaffineScorer(config.hidden_size, config.hidden_size, 1)
 
         self.init_weights()
 
