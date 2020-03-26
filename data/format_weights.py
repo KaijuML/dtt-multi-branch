@@ -53,7 +53,7 @@ class Strategy:
 
         assert all(isinstance(w, (float, int)) for w in eos_weights)
         if weight_regularization > 0:
-            eos_weights.append(weight_regularization)
+            eos_weights.insert(0, weight_regularization)
         if normalize:
             eos_weights = [w / sum(eos_weights) for w in eos_weights]
         self.eos_weights = eos_weights
@@ -66,8 +66,9 @@ class Strategy:
         raise NotImplementedError
 
     def score_weight(self, w):
-        s = [self.weight_regularization] if self.weight_regularization > 0 else list()
-        s.extend(self._score_weight(w))
+        s = self._score_weight(w)
+        if self.weight_regularization > 0:
+            s.insert(0, self.weight_regularization)
         if self.normalize:
             tot_s = sum(s)
             s = [_w/tot_s for _w in s]
