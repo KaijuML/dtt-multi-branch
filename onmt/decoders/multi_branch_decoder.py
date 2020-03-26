@@ -105,7 +105,7 @@ class MultiBranchRNNDecoder(RNNDecoderBase):
         super().init_state(src, memory_bank, encoder_final)
         repeats = [1] * len(self.state['hidden'][0].shape)
         repeats[-1] = len(self.rnns)
-        self.state['hidden'] = (h.repeat(*repeats) for h in self.state['hidden'])
+        self.state['hidden'] = tuple(h.repeat(*repeats) for h in self.state['hidden'])
     
     def _link_states(self, dec_states):
         if isinstance(dec_states[0], tuple):
