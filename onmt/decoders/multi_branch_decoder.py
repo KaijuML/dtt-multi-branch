@@ -92,6 +92,36 @@ class MultiBranchRNNDecoder(RNNDecoderBase):
             opt.reuse_copy_attn,
             opt.copy_attn_type)
 
+    def init_state(self, src, memory_bank, encoder_final):
+        """
+        This is a bit tricky: states is either a tensor or tuple of tensors.
+        Furthermore, OpenNMT needs them for stuff, especially during translation.
+        We therefore cannot return simply a list of tensors/tuples because all
+        their funcs won't work.
+        
+        Therefore we cat all hidden_states (and cell_states) on the last dim (features dim)
+        We will be able to _unlink_states later when needed inside the _run_forward_pass
+        """
+        super().init_state(src, memory_bank, encoder_final)
+        repeats = [1] * len(self.state['hidden'][0].shape)
+        repeats[-1] = len(self.rnns)
+        self.state['hidden'] = (h.repeat(*repeats) for h in self.state['hidden'])
+    
+    def _link_states(self, dec_states):
+        if isinstance(dec_states[0], tuple):
+            left = torch.cat([left for left, right in dec_states], dim=-1)
+            right = torch.cat([right for left, right in dec_states], dim=-1)
+            return left, right
+        return torch.cat(dec_states, dim=-1)
+    
+    def _unlink_states(self, dec_states):
+        if isinstance(dec_states, tuple):
+            dec_states = [state.chunk(len(self.rnns), dim=-1)
+                          for state in dec_states]
+            return list(zip(*dec_states))
+        else:
+            return dec_states.chunk(len(self.rnns), dim=-1)
+
     def _run_forward_pass(self, tgt, memory_bank, memory_lengths=None, **kwargs):
         """
         See StdRNNDecoder._run_forward_pass() for description
@@ -119,12 +149,15 @@ class MultiBranchRNNDecoder(RNNDecoderBase):
         emb = self.embeddings(tgt)
         assert emb.dim() == 3  # len x batch x embedding_dim
 
-        dec_states = [self.state["hidden"] for _ in self.rnns]
-
+        dec_states = self._unlink_states(self.state['hidden'])
+        #dec_state = self.state["hidden"]
+        
         # Input feed concatenates hidden state with
         # input at every time step.
         for idx, emb_t in enumerate(emb.split(1)):
             decoder_input = torch.cat([emb_t.squeeze(0), input_feed], 1)
+            
+            #rnn_output, dec_state = self.rnns[0](decoder_input, dec_state)
             
             new_states = list()
             for jdx, (rnn, dec_state) in enumerate(zip(self.rnns, dec_states)):
@@ -168,7 +201,7 @@ class MultiBranchRNNDecoder(RNNDecoderBase):
             elif self._reuse_copy_attn:
                 attns["copy"] = attns["std"]
 
-        return dec_state, dec_outs, attns
+        return self._link_states(dec_states), dec_outs, attns
 
     def _build_rnn(self, rnn_type, input_size,
                    hidden_size, num_layers, dropout):
