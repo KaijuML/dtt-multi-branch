@@ -7,6 +7,7 @@ from os import path
 
 import spacy
 from spacy.tokens.doc import Doc
+from spacy.tokens.token import Token
 from tqdm import tqdm
 
 from co_occurrence import data_folder, num_examples
@@ -22,12 +23,13 @@ def main():
     print(' [ok]')
 
     with open(path.join(data_folder, f'{subset}_output.txt')) as f_refs, \
-            open(path.join(data_folder, f'{subset}_pos_spacy.txt'), 'w') as f_tags:
+            open(path.join(data_folder, f'{subset}_deprel.txt'), 'w') as f_tags:
         for sentence in tqdm(f_refs, total=num_examples):
             sentence = Doc(nlp.vocab, sentence.split())
             sentence = nlp.tagger(sentence)
             for token in sentence:
-                f_tags.write(f'{token.text}\t{token.pos_}\n')
+                token: Token
+                f_tags.write(f'{token.text}\t{token.dep_}\t{0 if token.dep_ == "root" else token.head.i}\n')
             f_tags.write('\n')
 
 

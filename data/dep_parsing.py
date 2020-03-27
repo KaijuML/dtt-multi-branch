@@ -31,7 +31,7 @@ def read_conllu(path):
             if token.deprel and token.form:
                 t += 1
                 deprel = token.deprel.split(':')[0]
-                tagged_sentence.append((token.form.lower(), deprel, token.head))
+                tagged_sentence.append((token.form.lower(), token.upos, deprel, token.head))
         tagged_sentences.append(tagged_sentence)
     return tagged_sentences
 
@@ -62,8 +62,8 @@ def do_train(folder, gpus):
             sentences = read_conllu(os.path.join(folder, f'en_partut-ud-{subset}.conllu'))
             with open(file[subset], mode='w', encoding='utf8') as f:
                 for sentence in sentences:
-                    for token, deprel, head in sentence:
-                        f.write(f'{token} {deprel} {head}\n')
+                    for token, pos, deprel, head in sentence:
+                        f.write(f'{token} {pos} {deprel} {head}\n')
                     f.write('\n')
 
     label_file = os.path.join(folder, 'labels.txt')
@@ -97,7 +97,7 @@ def do_train(folder, gpus):
     print('Using the following arguments, please edit the script if needed')
     print(training_args)
 
-    shell(f'{env_variables} python run_ner.py {training_args} --do_train --evaluate_during_training')
+    shell(f'{env_variables} python3 run_ner.py {training_args} --do_train --evaluate_during_training')
 
 
 def run_script(examples, deprel_folder, wiki_folder, setname, gpus):
@@ -120,7 +120,7 @@ def run_script(examples, deprel_folder, wiki_folder, setname, gpus):
 
     cmd = " ".join([
         f'CUDA_VISIBLE_DEVICES={gpus}',
-        'python run_ner.py',
+        'python3 run_ner.py',
         f'--data_dir {deprel_folder}/',
         '--model_type bert_deprel',
         f'--labels {os.path.join(deprel_folder, "labels.txt")}',
@@ -129,7 +129,8 @@ def run_script(examples, deprel_folder, wiki_folder, setname, gpus):
         '--max_seq_length 256',
         '--do_predict',
         '--per_gpu_eval_batch_size 64',
-        '--label_size 2'
+        '--label_size 2',
+        '--input_size 2'
     ])
     shell(cmd)
 
