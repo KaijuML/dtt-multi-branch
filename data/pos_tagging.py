@@ -96,7 +96,7 @@ def do_train(folder, gpus):
     shell(f'{env_variables} python run_ner.py {training_args} --do_train')
     
     
-def run_script(examples, pos_folder, wiki_folder, setname, gpus):
+def run_script(examples, pos_folder, dest, gpus):
     
     # This dict is used to map the weirdly formatted tokens of wikibio 
     # to tokens known to BERT
@@ -108,6 +108,7 @@ def run_script(examples, pos_folder, wiki_folder, setname, gpus):
         "''": '"',
     }
     
+    # 
     path = os.path.join(pos_folder, 'test.txt')
     with open(path, mode='w', encoding='utf8') as f:
         for example in examples:
@@ -129,8 +130,6 @@ def run_script(examples, pos_folder, wiki_folder, setname, gpus):
     ])
     shell(cmd)
 
-    
-    dest = os.path.join(wiki_folder, f'{setname}_pos.txt')
     if not os.path.exists(dest):
         with open(dest, mode="w", encoding='utf8') as f:
             pass
@@ -153,6 +152,7 @@ def do_tagging(pos_folder, wiki_folder, setnames, gpus, split_size=int(5e4)):
         print(f'Loading examples from {setname}')
         
         path = os.path.join(wiki_folder, f'{setname}_output.txt')
+        dest = os.path.join(wiki_folder, f'{setname}_pos.txt')
         examples = list()
         with open(path, mode='r', encoding='utf8') as f:
             for line in f:
@@ -160,13 +160,28 @@ def do_tagging(pos_folder, wiki_folder, setnames, gpus, split_size=int(5e4)):
                 examples.append(line.strip())
                 
                 if split_size>0 and len(examples) >= split_size:
-                    run_script(examples, pos_folder, wiki_folder, setname, gpus)
+                    run_script(examples, pos_folder, dest, gpus)
                     examples = list()
                     
         if examples:
-            run_script(examples, pos_folder, wiki_folder, setname, gpus)
+            run_script(examples, pos_folder, dest, gpus)
         print('Done.')
             
+def do_file(pos_folder, orig, dest, gpus, split_size=int(5e4)):
+    """This will tag an individual file 'orig' into 'dest'"""
+    examples = list()
+    with open(orig, mode='r', encoding='utf8') as f:
+        for line in f:
+            if not line.strip(): continue
+            examples.append(line.strip())
+
+            if split_size>0 and len(examples) >= split_size:
+                run_script(examples, pos_folder, dest, gpus)
+                examples = list()
+
+    if examples:
+        run_script(examples, pos_folder, dest, gpus)
+    print('Done.')
 
 if __name__ == '__main__':
     
@@ -180,6 +195,12 @@ if __name__ == '__main__':
                         help='list of devices to train/predict on.')
     parser.add_argument('--split_size', dest='split_size', type=int, default=5e4,
                         help='To be memory efficient, process this much line at once only.')
+    
+    # These arguments are for stand-alone file
+    parser.add_argument('--orig', '-o', dest='orig',
+                        help='Name of the stand alone file')
+    parser.add_argument('--dest', '-d', dest='dest',
+                        help='Name of the resulting file')
     
     args = parser.parse_args()
     
@@ -198,3 +219,7 @@ if __name__ == '__main__':
         
     if args.do_tagging:
         do_tagging(pos_folder, wiki_folder, args.do_tagging, gpus, args.split_size)
+        
+    if args.orig:
+        assert os.path.exists(args.orig)
+        do_file(pos_folder, args.orig, args.dest, gpus, args.split_size)
