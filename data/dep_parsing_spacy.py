@@ -27,8 +27,8 @@ def read_sentence(f):
 
 def main():
     print('Loading SpaCy parser...', end='')
-    os.system('python3 -m spacy download en_core_web_sm > /dev/null')
-    nlp = spacy.load("en_core_web_sm")
+    os.system('python3 -m spacy download en_core_web_lg > /dev/null')
+    nlp = spacy.load("en_core_web_lg")
     print(' [ok]')
 
     with open(args.orig) as f_refs, open(args.dest, 'w') as f_tags:
