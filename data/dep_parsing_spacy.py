@@ -20,7 +20,8 @@ tok_mapping = {
 def read_sentence(f):
     if args.format == 'sent':
         pbar.update()
-        return f.readline().strip().split()
+        sentence = f.readline().strip().split()
+        return [tok_mapping.get(token, token) for token in sentence]
     else:
         assert args.format == 'word'
         sentence = []
