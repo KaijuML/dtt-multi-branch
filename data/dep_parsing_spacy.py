@@ -8,6 +8,14 @@ import spacy
 from spacy.tokens.doc import Doc
 from tqdm import tqdm
 
+tok_mapping = {
+    '-lrb-': '(',
+    '-rrb-': ')',
+    '--': '-',
+    '``': '"',
+    "''": '"',
+}
+
 
 def read_sentence(f):
     if args.format == 'sent':
@@ -20,7 +28,8 @@ def read_sentence(f):
             pbar.update()
             line = f.readline()
             if line.strip():
-                sentence.append(line.split()[0])
+                token = line.split()[0]
+                sentence.append(tok_mapping.get(token, token))
             else:
                 return sentence
 
@@ -32,7 +41,7 @@ def main():
     print(' [ok]')
 
     with open(args.orig) as f_refs, open(args.dest, 'w') as f_tags:
-        while not f_refs.closed:
+        while pbar.n < pbar.total:
             sentence = Doc(nlp.vocab, read_sentence(f_refs))
             sentence = nlp.parser(sentence)
             for token in sentence:
