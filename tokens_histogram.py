@@ -10,7 +10,7 @@ from os import path
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
-from co_occurrence import pos_filename, data_folder, interesting_tags, num_words
+from data.co_occurrence import pos_filename, data_folder, interesting_tags, num_words
 
 
 def main():
