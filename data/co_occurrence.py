@@ -67,9 +67,7 @@ def expand(token, h):
     ancestor = ascend_dependency_tree(token)
     if ancestor:
         for t in ancestor.subtree:
-            if t.pos_ in interesting_tags:
-                h[t.i] = h[t.i] * h[token.i]
-            else:
+            if t.pos_ not in interesting_tags:
                 h[t.i] = max(h[t.i], h[token.i])
 
 
