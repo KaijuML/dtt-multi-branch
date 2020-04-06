@@ -233,14 +233,15 @@ def parent_instance_level(package,
     return c_prec, c_rec, c_f
 
 
-def parent(predictions,
+def _parent(predictions,
            references,
            tables,
            lambda_weight=0.5,
            smoothing=0.00001,
            max_order=4,
            entailment_fn=overlap_probability,
-           mention_fn=_mention_probability):
+           mention_fn=_mention_probability,
+           n_jobs=-1):
     """Metric for comparing predictions to references given tables.
 
     Args:
@@ -280,7 +281,7 @@ def parent(predictions,
                       entailment_fn=entailment_fn,
                       mention_fn=mention_fn)
     
-    with mp.Pool(processes=mp.cpu_count()) as pool:
+    with mp.Pool(processes=mp.cpu_count() if n_jobs < 0 else n_jobs) as pool:
         processed_packages = pool.map(_parent, zip(predictions, references, tables))
     
     
@@ -289,9 +290,35 @@ def parent(predictions,
         precisions.append(p)
         recalls.append(r)
         all_f_scores.append(f)
+        
+    return precisions, recalls, all_f_scores
 
-    avg_precision = sum(precisions) / len(precisions)
-    avg_recall = sum(recalls) / len(recalls)
-    avg_f_score = sum(all_f_scores) / len(all_f_scores)
 
-    return avg_precision, avg_recall, avg_f_score, all_f_scores
+def parent(predictions,
+           references,
+           tables,
+           lambda_weight=0.5,
+           smoothing=0.00001,
+           max_order=4,
+           entailment_fn=overlap_probability,
+           mention_fn=_mention_probability,
+           n_jobs=-1,
+           avg_results=True):
+    
+    precisions, recalls, f_scores = _parent(
+            predictions,
+            references,
+            tables,
+            lambda_weight=0.5,
+            smoothing=0.00001,
+            max_order=4,
+            entailment_fn=overlap_probability,
+            mention_fn=_mention_probability,
+            n_jobs=-1)
+        
+    if avg_results:
+        precisions = sum(precisions) / len(precisions)
+        recalls = sum(recalls) / len(recalls)
+        f_scores = sum(f_scores) / len(f_scores)
+
+    return precisions, recalls, f_scores
