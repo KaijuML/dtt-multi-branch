@@ -76,15 +76,19 @@ def build_encoder(opt, embeddings):
     return str2enc[enc_type].from_opt(opt, embeddings)
 
 
-def build_decoder(opt, embeddings):
+
+def build_decoder(opt, embeddings, dims=None):
     """
     Various decoder dispatcher function.
     Args:
         opt: the option in current environment.
         embeddings (Embeddings): vocab embeddings for this decoder.
+        dims (tuple of int): used when Encoder/Decoder are structure_aware
     """
     dec_type = "ifrnn" if opt.decoder_type == "rnn" and opt.input_feed \
                else opt.decoder_type
+    if dims is not None:
+        return str2dec[dec_type].from_opt(opt, embeddings, dims)
     return str2dec[dec_type].from_opt(opt, embeddings)
 
 
@@ -147,6 +151,14 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
 
     # Build encoder.
     encoder = build_encoder(model_opt, src_emb)
+    
+    if model_opt.decoder_type == 'sarnn':
+        dims = (
+            encoder.embeddings.emb_luts[0].embedding_dim,
+            encoder.embeddings.emb_luts[1].embedding_dim
+        )
+    else:
+        dims = None
 
     # Build decoder.
     tgt_field = fields["tgt"]
@@ -160,7 +172,7 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
 
         tgt_emb.word_lut.weight = src_emb.word_lut.weight
 
-    decoder = build_decoder(model_opt, tgt_emb)
+    decoder = build_decoder(model_opt, tgt_emb, dims)
 
     # Build NMTModel(= encoder + decoder).
     if gpu and gpu_id is not None:
