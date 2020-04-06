@@ -10,9 +10,11 @@ from onmt.modules.embeddings import Embeddings, PositionalEncoding, \
     VecEmbedding
 from onmt.modules.weight_norm import WeightNormConv2d
 from onmt.modules.average_attn import AverageAttention
+from onmt.modules.dual_attention import DualAttention
 
 __all__ = ["Elementwise", "context_gate_factory", "ContextGate",
            "GlobalAttention", "ConvMultiStepAttention", "CopyGenerator",
            "CopyGeneratorLoss", "CopyGeneratorLossCompute",
            "MultiHeadedAttention", "Embeddings", "PositionalEncoding",
-           "WeightNormConv2d", "AverageAttention", "VecEmbedding"]
+           "WeightNormConv2d", "AverageAttention", "VecEmbedding",
+           "DualAttention"]
