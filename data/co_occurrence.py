@@ -2,14 +2,14 @@
 Creates the hallucination score file {subset}_h.txt, using information from PoS tags (assumed in {subset}_pos.txt)
 and Spacy detected in-sentence dependencies.
 """
+from collections import Counter
+from tqdm import tqdm, trange
+from os.path import exists
+
 import argparse
 import json
 import os
-import pickle
-from collections import Counter
-from os.path import exists
 
-from tqdm import tqdm, trange
 
 interesting_tags = ['NOUN', 'ADJ', 'NUM', 'PROPN']
 
@@ -144,52 +144,86 @@ def read_sentence(pos_file, deprel_file=None):
             sentence.append((word, tag) + ((rel, int(head)) if deprel_file else ()))
         else:
             return sentence
+        
 
+def count_co_occurrences(filename, tables_loc, pos_loc):
+    """
+    Count co-occurrences in the training set. 
+    """
+    
+    # If filename exists, simply returned cached co-occurrences
+    if os.path.exists(filename):
+        with open(filename, mode="r", encoding='utf8') as f:
+            return {
+                tuple(key.split()): value
+                for key, value in json.load(f).items()
+            }
+        
+    
+    # Counting number of examples (by counting number of tables)
+    num_examples = int(os.popen(f'wc -l < {tables_loc}').read())
+    
+    # Creating co_occur dict
+    co_occur = dict()
+    
+    with open(tables_loc, mode="r", encoding='utf8') as tables_file, \
+         open(pos_loc, mode="r", encoding="utf8") as refs_file:
+        
+        for _ in trange(num_examples, desc='Counting co-occurrences'):
+            
+            # reading the next example from both input/output files
+            table = json.loads(tables_file.readline())  # source table
+            sentence = read_sentence(refs_file)         # target sentence
+            
+            for key, values in table:
+                table_items = [(key, value) for value in values]
+                for table_item in table_items:
+                    # Only include interestingly tagged tokens that are not equal to the table value
+                    # noinspection PyTypeChecker
+                    co_occur.setdefault(table_item, Counter()) \
+                        .update([token for token, pos in sentence
+                                 if pos in interesting_tags and token != table_item[-1]])
+
+    # We filter the co_occur dictionary.
+    # We keep only elements whose total co_occurrences number is in the 5th percentile
+    # We also convert raw counts to normalized scores in [0, 1]
+    
+    sorted_keys = sorted(
+        co_occur, 
+        key=lambda x: max(co_occur[x].values()) if len(co_occur[x]) else 0,
+        reverse=True
+    )
+    
+    co_occur = {
+        key: {
+            t: hallucination_inv_score(c, max(co_occur[key].values()))
+            for t, c in co_occur[key].items()
+            if c > 5
+        }
+        # we iterate through all keys
+        for idx, key in tqdm(enumerate(sorted_keys), 
+                             desc='Extracting common co-occurrences',
+                             total=len(sorted_keys))
+        
+        # we only keep the top 5th percentile
+        if idx / len(sorted_keys) < 0.05
+    }
+
+    # We cache the resulting dict to save time later
+    print(f'Serializing co-occurrences dict to {filename}')
+    with open(filename, mode='w', encoding='utf8') as f:
+        json.dump({' '.join(key): val for key, val in co_occur.items()}, f)
+
+    return co_occur
 
 def main():
-    if exists(args.frequencies):
-        with open(args.frequencies, 'rb') as f:
-            co_occur = pickle.load(f)
-    else:
-        #
-        # Create co_occur Counter object
-        #
-        co_occur = dict()
-        with open(args.freq_input) as tables_file, open(args.freq_pos) as refs_file:
-            num_examples = int(os.popen(f'wc -l < {args.freq_input}').read())
-            for _ in trange(num_examples, desc='Counting co-occurrences'):
-                sentence = read_sentence(refs_file)
-
-                table = json.loads(tables_file.readline())
-                for key, values in table:
-                    table_items = [(key, value) for value in values]
-                    for table_item in table_items:
-                        # Only include interestingly tagged tokens that are not equal to the table value
-                        # noinspection PyTypeChecker
-                        co_occur.setdefault(table_item, Counter()) \
-                            .update([token for token, pos in sentence
-                                     if pos in interesting_tags and token != table_item[-1]])
-
-        #
-        # Keep only elements whose total co_occurrences number is in the 5th percentile
-        # Convert counts to scores
-        #
-        keys = sorted(co_occur.keys(), key=lambda x: max(co_occur[x].values()) if len(co_occur[x]) else 0, reverse=True)
-        for i, k in tqdm(enumerate(keys), desc='Extracting common co-occurrences', total=len(keys)):
-            if i / len(keys) < 0.05:
-                co_occur[k] = {t: hallucination_inv_score(c, max(co_occur[k].values()))
-                               for t, c in co_occur[k].items()
-                               if c > 5}
-            else:
-                del co_occur[k]
-
-        with open(args.frequencies, 'wb') as f:
-            pickle.dump(co_occur, f)
-
-    #
-    # STEP 3
+    
+    # Count co-occurences in the training set
+    co_occur = count_co_occurrences(args.frequencies, args.freq_input, args.freq_pos)
+    
+    return
+    
     # Score each sentence token, according to the corresponding table and its co-occurrences
-    #
     with open(args.input) as tables_file, open(args.scores, 'w') as hallucination_file, \
             open(args.pos) as pos_file, open(args.deprel) as deprel_file:
 
@@ -221,19 +255,19 @@ def main():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--frequencies', '-f', required=True,
-                        help='Pickled file containing filtered co-occurrences dict. '
-                             'If it does not exists, it will be created after the co-occurrences computation')
+                        help='Cached file containing filtered co-occurrences dict. '
+                             'If it does not exists, it will be used to store the co-occurrences count')
     parser.add_argument('--freq-input', '-fin', help='The .jl tables file used to compute co-occurrences')
     parser.add_argument('--freq-pos', '-fpos', help='The references PoS file used to compute co-occurrences')
 
-    parser.add_argument('--input', '-i', required=True,
-                        help='The input tables file')
-    parser.add_argument('--pos', '-p', required=True,
-                        help='PoS outputs file')
-    parser.add_argument('--deprel', '-d', required=True,
-                        help='Dependency relations outputs file')
-    parser.add_argument('--scores', '-s', required=True,
-                        help='Scores file to write')
+   # parser.add_argument('--input', '-i', required=True,
+    #                    help='The input tables file')
+    #parser.add_argument('--pos', '-p', required=True,
+     #                   help='PoS outputs file')
+    #parser.add_argument('--deprel', '-d', required=True,
+     #                   help='Dependency relations outputs file')
+    #parser.add_argument('--scores', '-s', required=True,
+     #                   help='Scores file to write')
 
     args = parser.parse_args()
 
