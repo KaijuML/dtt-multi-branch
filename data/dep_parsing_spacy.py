@@ -1,12 +1,15 @@
 """
 Uses Spacy to tokenize a dataset's *_output.txt file.
 """
+from spacy.tokens.doc import Doc
+
+import multiprocessing as mp
 import argparse
+import spacy
+import tqdm
+import time
 import os
 
-import spacy
-from spacy.tokens.doc import Doc
-from tqdm import tqdm
 
 tok_mapping = {
     '-lrb-': '(',
@@ -16,39 +19,34 @@ tok_mapping = {
     "''": '"',
 }
 
-
-def read_sentence(f):
-    if args.format == 'sent':
-        pbar.update()
-        sentence = f.readline().strip().split()
-        return [tok_mapping.get(token, token) for token in sentence]
-    else:
-        assert args.format == 'word'
-        sentence = []
-        while True:
-            pbar.update()
-            line = f.readline()
+            
+def load_tagged_file(filename):
+    instances = list()
+    instance = list()
+    with open(filename, mode="r", encoding='utf8') as f:
+        for line in f:
             if line.strip():
-                token = line.split()[0]
-                sentence.append(tok_mapping.get(token, token))
+                instance.append(line.strip().split())
             else:
-                return sentence
+                instances.append(instance)
+                instance = list()
+    if instance: instances.append(instance)
+    return instances
 
 
-def main():
-    print('Loading SpaCy parser...', end='')
-    os.system('python3 -m spacy download en_core_web_lg > /dev/null')
-    nlp = spacy.load("en_core_web_lg")
-    print(' [ok]')
-
-    with open(args.orig) as f_refs, open(args.dest, 'w') as f_tags:
-        while pbar.n < pbar.total:
-            sentence = Doc(nlp.vocab, read_sentence(f_refs))
-            sentence = nlp.parser(sentence)
-            for token in sentence:
-                f_tags.write(f'{token.text}\t{token.dep_}\t{0 if token.dep_ == "root" else token.head.i}\n')
-            f_tags.write('\n')
-
+def _load_spacy(pkg='en_core_web_lg'):
+    try:
+        nlp = spacy.load(pkg)
+    except OSError as error:
+        if f"Can't find model '{pkg}'" in error.args[0]:
+            print(f'Downloading {pkg} from spacy servers...')
+            os.system('python3 -m spacy download en_core_web_lg > /dev/null')
+            print('Done. Loading parser...')
+            nlp = spacy.load(pkg)
+        else:
+            raise error
+    return nlp
+            
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -61,10 +59,52 @@ if __name__ == '__main__':
                         help='Format of the orig file:\n\t'
                              '"word" means one word per line (only the first one is considered)\n\t'
                              '"sent" means one sentence per line, and words will be identified using .split()')
+    
+    group = parser.add_argument_group('Arguments regarding multiprocessing')
+    group.add_argument('--n_jobs', dest='n_jobs', type=int, default=-1,
+                        help='number of processes to use. <0 for cpu_count()')
 
     args = parser.parse_args()
+    
+    print('Loading sentences...')
+    start_load = time.time()
+    if args.format == 'sent':
+        with open(args.orig, mode="r", encoding='utf8') as f:
+            sentences = [line.strip().split() for line in f]
+    else:
+        sentences = load_tagged_file(args.orig)
+    end_load = time.time()
+    print(f'[OK] ({len(sentences)} sentences in {end_load - start_load} seconds)')
+    
+    print('Loading SpaCy parser...')
+    nlp = _load_spacy()
+    end_load = time.time()
+    print(f'[OK] ({end_load - start_load} seconds)')
 
-    total = int(os.popen(f'wc -l < {args.orig}').read())
-    pbar = tqdm(total=total)
-
-    main()
+    # this is the function to apply to all sentences
+    def _deal_with_one_instance(sentence):
+        ret = nlp.parser(Doc(nlp.vocab, sentence))
+        return '\n'.join([
+            f'{token.text}\t{token.dep_}\t{0 if token.dep_ == "root" else token.head.i}'
+            for token in ret
+        ])
+    
+    n_jobs = mp.cpu_count() if args.n_jobs < 0 else args.n_jobs
+    print(f'Using {n_jobs} processes, starting now.')
+    
+    with mp.Pool(processes=n_jobs) as pool:
+        processed_sentences = [item for item in tqdm.tqdm(
+            pool.imap(
+                _deal_with_one_instance, 
+                sentences,
+                chunksize=1#len(sentences) // n_jobs
+            ),
+            desc='Parsing sentences',
+            total=len(sentences)
+        )]
+    
+    print('Serializing results, one token + tags per line',
+          '+ empty line to separate sentences')
+    with open(args.dest, mode='w', encoding='utf8') as f_tags:
+        for sentence in processed_sentences:
+            f_tags.write(sentence + '\n\n')
