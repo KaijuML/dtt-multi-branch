@@ -79,7 +79,7 @@ if __name__ == '__main__':
     print(f'[OK] ({len(sentences)} sentences in {time_taken} seconds)')
     
     print('Loading SpaCy parser...')
-    start_load = time()
+    start_load = time.time()
     nlp = _load_spacy()
     time_taken = np.round(time.time() - start_load, decimals=3)
     print(f'[OK] ({time_taken} seconds)')
@@ -100,7 +100,7 @@ if __name__ == '__main__':
             pool.imap(
                 _deal_with_one_instance, 
                 sentences,
-                chunksize=1#len(sentences) // n_jobs
+                chunksize=10
             ),
             desc='Parsing sentences',
             total=len(sentences)
