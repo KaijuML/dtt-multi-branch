@@ -266,7 +266,7 @@ def deal_with_one_instance(zipped_args, co_occur):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     
-    group = parser.add_argument_group('Argumements to parametrize the co-occurrences count')
+    group = parser.add_argument_group('Arguments to parametrize the co-occurrences count')
     group.add_argument('--frequencies', '-f', required=True,
                         help='Cached file containing filtered co-occurrences dict. '
                              'If it does not exists, it will be used to store the co-occurrences count')
@@ -274,7 +274,7 @@ if __name__ == '__main__':
     group.add_argument('--freq-pos', '-fpos', help='The references PoS file used to compute co-occurrences')
 
     
-    group = parser.add_argument_group('Argumements to parametrize the scoring')
+    group = parser.add_argument_group('Arguments to parametrize the scoring')
     group.add_argument('--input', '-i', required=True,
                         help='The input tables file')
     group.add_argument('--pos', '-p', required=True,
@@ -284,7 +284,8 @@ if __name__ == '__main__':
     group.add_argument('--scores', '-s', required=True,
                         help='Scores file to write')
     
-    parser.add_argument('--n_jobs', dest='n_jobs', type=int, default=-1,
+    group = parser.add_argument_group('Arguments regarding multiprocessing')
+    group.add_argument('--n_jobs', dest='n_jobs', type=int, default=-1,
                         help='number of processes to use. <0 for cpu_count()')
 
     args = parser.parse_args()
@@ -319,7 +320,8 @@ if __name__ == '__main__':
         processed_packages = [item for item in tqdm.tqdm(
             pool.imap(
                 _deal_with_one_instance, 
-                zip(tables, sentences_pos, sentences_dep)
+                zip(tables, sentences_pos, sentences_dep),
+                chunksize=len(tables) // n_jobs
             ),
             total=len(tables)
         )]
