@@ -4,6 +4,8 @@ Uses Spacy to tokenize a dataset's *_output.txt file.
 from spacy.tokens.doc import Doc
 
 import multiprocessing as mp
+import numpy as np
+
 import argparse
 import spacy
 import tqdm
@@ -73,13 +75,14 @@ if __name__ == '__main__':
             sentences = [line.strip().split() for line in f]
     else:
         sentences = load_tagged_file(args.orig)
-    end_load = time.time()
-    print(f'[OK] ({len(sentences)} sentences in {end_load - start_load} seconds)')
+    time_taken = np.round(time.time() - start_load, decimals=3)
+    print(f'[OK] ({len(sentences)} sentences in {time_taken} seconds)')
     
     print('Loading SpaCy parser...')
+    start_load = time()
     nlp = _load_spacy()
-    end_load = time.time()
-    print(f'[OK] ({end_load - start_load} seconds)')
+    time_taken = np.round(time.time() - start_load, decimals=3)
+    print(f'[OK] ({time_taken} seconds)')
 
     # this is the function to apply to all sentences
     def _deal_with_one_instance(sentence):
