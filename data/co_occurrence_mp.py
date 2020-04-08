@@ -4,13 +4,13 @@ and Spacy detected in-sentence dependencies.
 """
 from collections import Counter
 from functools import partial
-from tqdm import tqdm, trange
 
 import multiprocessing as mp
 
 import itertools
 import datetime
 import argparse
+import tqdm
 import json
 import time
 import os
@@ -177,7 +177,7 @@ def count_co_occurrences(filename, tables_loc, pos_loc):
     with open(tables_loc, mode="r", encoding='utf8') as tables_file, \
          open(pos_loc, mode="r", encoding="utf8") as refs_file:
         
-        for _ in trange(num_examples, desc='Counting co-occurrences'):
+        for _ in tqdm.trange(num_examples, desc='Counting co-occurrences'):
             
             # reading the next example from both input/output files
             table = json.loads(tables_file.readline())  # source table
@@ -209,9 +209,9 @@ def count_co_occurrences(filename, tables_loc, pos_loc):
             if c > 5
         }
         # we iterate through all keys
-        for idx, key in tqdm(enumerate(sorted_keys), 
-                             desc='Extracting common co-occurrences',
-                             total=len(sorted_keys))
+        for idx, key in tqdm.tqdm(enumerate(sorted_keys), 
+                                  desc='Extracting common co-occurrences',
+                                  total=len(sorted_keys))
         
         # we only keep the top 5th percentile
         if idx / len(sorted_keys) < 0.05
@@ -289,6 +289,13 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     
+    if os.path.exists(args.scores):
+        print(f'{args.scores} already exists, it will be overwritten.',
+              'Stop the process ASAP to avoid this')
+    else:
+        with open(args.scores, mode="w", encoding='utf8') as f:
+            pass  # touch
+
     # Count co-occurences in the training set
     co_occur = count_co_occurrences(args.frequencies, args.freq_input, args.freq_pos)
     
@@ -306,12 +313,16 @@ if __name__ == '__main__':
     # a list of pointers and no duplicated dict so this op could be useless
     _deal_with_one_instance = partial(deal_with_one_instance, co_occur=co_occur)
     
-    print('Using {n_jobs} processes, starting now')
-    with mp.Pool(processes=mp.cpu_count() if args.n_jobs < 0 else args.n_jobs) as pool:
-        processed_packages = pool.map(
-            _deal_with_one_instance, 
-            zip(tables, sentences_pos, sentences_dep)
-        )
+    n_jobs = mp.cpu_count() if args.n_jobs < 0 else args.n_jobs
+    print(f'Using {n_jobs} processes, starting now')
+    with mp.Pool(processes=n_jobs) as pool:
+        processed_packages = [item for item in tqdm.tqdm(
+            pool.imap(
+                _deal_with_one_instance, 
+                zip(tables, sentences_pos, sentences_dep)
+            ),
+            total=len(tables)
+        )]
     
     print(f'Processing done, serializing results to {args.scores}')
     with open(args.scores, mode='w', encoding='utf8') as f:
