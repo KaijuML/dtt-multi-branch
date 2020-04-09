@@ -31,6 +31,8 @@ def translate(opt):
             attn_debug=opt.attn_debug,
             align_debug=opt.align_debug
             )
+        
+    return opt
 
 
 def _get_parser():
@@ -45,8 +47,10 @@ def main(args=None):
     parser = _get_parser()
 
     opt = parser.parse_args(args) if args else parser.parse_args()
-    translate(opt)
+    opt = translate(opt)
+    
+    return opt
 
 
 if __name__ == "__main__":
-    main()
+    _ = main()

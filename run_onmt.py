@@ -23,5 +23,7 @@ if __name__ == '__main__':
     elif mode.train:
         train(remaining_args)
     elif mode.translate:
-        translate(remaining_args)
+        args = translate(remaining_args)
+        
+        # TODO compute scores directly after the translation is done
     
