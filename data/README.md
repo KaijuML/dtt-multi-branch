@@ -113,3 +113,12 @@ python3 co_occurrence.py --freq-input wikibio/train_tables.jl --freq-pos wikibio
 
 The script will create the scores file `wikibio/train_h.txt` (this takes 6 to 8 hours, be patient!), which will be used
 to train our multi-branch decoder.
+
+
+### Filtering wikipedia based on scores
+
+We can filter the training set and remove any word which has an hallucination score above a specified threshold:
+
+```bash
+python3 filter_dataset.py --dest wikibio/train_output_filtered.txt --scores wikibio/train_h.txt --refs wikibio/train_output.txt --threshold 0 --n_jobs -1
+```
