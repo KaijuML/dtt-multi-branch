@@ -28,7 +28,8 @@ def load_tagged_file(filename):
     with open(filename, mode="r", encoding='utf8') as f:
         for line in f:
             if line.strip():
-                instance.append(line.strip().split())
+                token = line.strip().split()[0]
+                instance.append(tok_mapping.get(token, token))
             else:
                 instances.append(instance)
                 instance = list()
@@ -72,7 +73,11 @@ if __name__ == '__main__':
     start_load = time.time()
     if args.format == 'sent':
         with open(args.orig, mode="r", encoding='utf8') as f:
-            sentences = [line.strip().split() for line in f]
+            sentences = [
+                [tok_mapping.get(token, token)
+                 for token in line.strip().split()]
+                for line in f
+            ]
     else:
         sentences = load_tagged_file(args.orig)
     time_taken = np.round(time.time() - start_load, decimals=3)

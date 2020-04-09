@@ -139,17 +139,25 @@ def read_sentence(sentence_pos, sentence_dep=None):
     sentence = list()
     if sentence_dep is None:
         sentence_dep = [[None, None, None] for _ in range(len(sentence_pos))]
+
+    assert len(sentence_pos) == len(sentence_dep), sentence_pos + ['//'] + sentence_dep
         
     for (word, tag), (_word, rel, head) in zip(sentence_pos, sentence_dep):
         
         # sanity check
-        assert _word is None or _word == word
+        assert _word is None or _word == word, f'<{_word}> vs <{word}>'
         
         # noinspection PyTypeChecker
         sentence.append((word, tag) + ((rel, int(head)) if _word is not None else ()))
         
     return sentence
-        
+    
+
+def _iter_tagged_file(file):
+    ret = list()
+    while line := file.readline().strip():
+        ret.append(line.split())
+    return ret
 
 def count_co_occurrences(filename, tables_loc, pos_loc):
     """
@@ -181,7 +189,7 @@ def count_co_occurrences(filename, tables_loc, pos_loc):
             
             # reading the next example from both input/output files
             table = json.loads(tables_file.readline())  # source table
-            sentence = read_sentence(refs_file)         # target sentence
+            sentence = _iter_tagged_file(refs_file)     # target sentence
             
             for key, values in table:
                 table_items = [(key, value) for value in values]
@@ -191,16 +199,18 @@ def count_co_occurrences(filename, tables_loc, pos_loc):
                     co_occur.setdefault(table_item, Counter()) \
                         .update([token for token, pos in sentence
                                  if pos in interesting_tags and token != table_item[-1]])
-
+    
     # We filter the co_occur dictionary.
     # We keep only elements whose total co_occurrences number is in the 5th percentile
     # We also convert raw counts to normalized scores in [0, 1]
     
+    print('Sorting keys')
     sorted_keys = sorted(
         co_occur, 
         key=lambda x: max(co_occur[x].values()) if len(co_occur[x]) else 0,
         reverse=True
-    )
+    )[1:]  # I remove the first key because I have manually seen that it's useless
+    print('Key are sorted')
     
     co_occur = {
         key: {
@@ -224,6 +234,7 @@ def count_co_occurrences(filename, tables_loc, pos_loc):
 
     return co_occur
 
+
 def load_tagged_file(filename):
     instances = list()
     instance = list()
@@ -236,31 +247,6 @@ def load_tagged_file(filename):
                 instance = list()
     if instance: instances.append(instance)
     return instances
-
-
-def deal_with_one_instance(zipped_args, co_occur):
-    
-    input_table, input_pos, input_deprel = zipped_args 
-    
-    scores = build_scores(input_table, co_occur)
-    sentence = build_sentence_object(read_sentence(input_pos, input_deprel))
-    
-    h = [int(token.pos_ in interesting_tags) for token in sentence]
-
-    # Score each token
-    for token in sentence:
-        if h[token.i]:
-            h[token.i] -= scores.get(token.text, 0)
-
-    # expand the hallucination scores
-    for token in sentence:
-        if token.pos_ in interesting_tags and h[token.i] > 0:
-            expand(token, h)
-
-    # Some tricks to harmonize the scoring
-    handle_sentence_punctuation(sentence, h)
-    
-    return sentence, h
 
 
 if __name__ == '__main__':
@@ -287,12 +273,16 @@ if __name__ == '__main__':
     group = parser.add_argument_group('Arguments regarding multiprocessing')
     group.add_argument('--n_jobs', dest='n_jobs', type=int, default=-1,
                         help='number of processes to use. <0 for cpu_count()')
+    group.add_argument('--chunksize', dest='chunksize', type=int, default=10,
+                        help='chunksize to use in mp.Pool().imap()' \
+                             'Change this if you know what you are doing.')
 
     args = parser.parse_args()
     
     if os.path.exists(args.scores):
-        print(f'{args.scores} already exists, it will be overwritten.',
-              'Stop the process ASAP to avoid this')
+        print('\nWARNING:',
+              f'{args.scores} already exists, it will be overwritten.',
+              'Stop the process ASAP to avoid this\n')
     else:
         with open(args.scores, mode="w", encoding='utf8') as f:
             pass  # touch
@@ -308,11 +298,29 @@ if __name__ == '__main__':
     sentences_pos = load_tagged_file(args.pos)
     sentences_dep = load_tagged_file(args.deprel)
     
-    # This might be useless, we'll never know without extensive tests
-    # The idea is avoid duplicating the co_occur dict many times.
-    # But doing [co_occur for _ in range(XXX)] should results in
-    # a list of pointers and no duplicated dict so this op could be useless
-    _deal_with_one_instance = partial(deal_with_one_instance, co_occur=co_occur)
+    def _deal_with_one_instance(zipped_args):
+    
+        input_table, input_pos, input_deprel = zipped_args 
+
+        scores = build_scores(input_table, co_occur)
+        sentence = build_sentence_object(read_sentence(input_pos, input_deprel))
+
+        h = [int(token.pos_ in interesting_tags) for token in sentence]
+
+        # Score each token
+        for token in sentence:
+            if h[token.i]:
+                h[token.i] -= scores.get(token.text, 0)
+
+        # expand the hallucination scores
+        for token in sentence:
+            if token.pos_ in interesting_tags and h[token.i] > 0:
+                expand(token, h)
+
+        # Some tricks to harmonize the scoring
+        handle_sentence_punctuation(sentence, h)
+
+        return sentence, h
     
     n_jobs = mp.cpu_count() if args.n_jobs < 0 else args.n_jobs
     print(f'Using {n_jobs} processes, starting now')
@@ -321,7 +329,7 @@ if __name__ == '__main__':
             pool.imap(
                 _deal_with_one_instance, 
                 zip(tables, sentences_pos, sentences_dep),
-                chunksize=len(tables) // n_jobs
+                chunksize=args.chunksize if args.chunksize>0 else 1
             ),
             total=len(tables)
         )]
