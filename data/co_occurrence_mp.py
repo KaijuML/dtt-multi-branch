@@ -2,6 +2,8 @@
 Creates the hallucination score file {subset}_h.txt, using information from PoS tags (assumed in {subset}_pos.txt)
 and Spacy detected in-sentence dependencies.
 """
+from utils import FileIterable, TaggedFileIterable
+
 from collections import Counter
 from functools import partial
 
@@ -135,7 +137,7 @@ def handle_sentence_punctuation(sentence, h):
                 h[j] = min_h
 
 
-def read_sentence(sentence_pos, sentence_dep=None):
+def fuse_pos_and_deprel(sentence_pos, sentence_dep=None):
     sentence = list()
     if sentence_dep is None:
         sentence_dep = [[None, None, None] for _ in range(len(sentence_pos))]
@@ -151,13 +153,7 @@ def read_sentence(sentence_pos, sentence_dep=None):
         sentence.append((word, tag) + ((rel, int(head)) if _word is not None else ()))
         
     return sentence
-    
 
-def _iter_tagged_file(file):
-    ret = list()
-    while line := file.readline().strip():
-        ret.append(line.split())
-    return ret
 
 def count_co_occurrences(filename, tables_loc, pos_loc):
     """
@@ -174,31 +170,25 @@ def count_co_occurrences(filename, tables_loc, pos_loc):
             }
 
     print('Counting co-occurrences between source tables and target sentences')
-    
-    # Counting number of examples (by counting number of tables)
-    print('Counting number of examples')
-    num_examples = int(os.popen(f'wc -l < {tables_loc}').read())
+        
+    tables = FileIterable.from_filename(tables_loc, fmt='jl')
+    sentences = TaggedFileIterable.from_filename(pos_loc)
     
     # Creating co_occur dict
     co_occur = dict()
-    
-    with open(tables_loc, mode="r", encoding='utf8') as tables_file, \
-         open(pos_loc, mode="r", encoding="utf8") as refs_file:
-        
-        for _ in tqdm.trange(num_examples, desc='Counting co-occurrences'):
-            
-            # reading the next example from both input/output files
-            table = json.loads(tables_file.readline())  # source table
-            sentence = _iter_tagged_file(refs_file)     # target sentence
-            
-            for key, values in table:
-                table_items = [(key, value) for value in values]
-                for table_item in table_items:
-                    # Only include interestingly tagged tokens that are not equal to the table value
-                    # noinspection PyTypeChecker
-                    co_occur.setdefault(table_item, Counter()) \
-                        .update([token for token, pos in sentence
-                                 if pos in interesting_tags and token != table_item[-1]])
+
+    for table, sentence in tqdm.tqdm(zip(tables, sentences), 
+                         desc='Counting co-occurrences', 
+                         total=len(tables)):
+
+        for key, values in table:
+            table_items = [(key, value) for value in values]
+            for table_item in table_items:
+                # Only include interestingly tagged tokens that are not equal to the table value
+                # noinspection PyTypeChecker
+                co_occur.setdefault(table_item, Counter()) \
+                    .update([token for token, pos in sentence
+                             if pos in interesting_tags and token != table_item[-1]])
     
     # We filter the co_occur dictionary.
     # We keep only elements whose total co_occurrences number is in the 5th percentile
@@ -235,20 +225,6 @@ def count_co_occurrences(filename, tables_loc, pos_loc):
     return co_occur
 
 
-def load_tagged_file(filename):
-    instances = list()
-    instance = list()
-    with open(filename, mode="r", encoding='utf8') as f:
-        for line in f:
-            if line.strip():
-                instance.append(line.strip().split())
-            else:
-                instances.append(instance)
-                instance = list()
-    if instance: instances.append(instance)
-    return instances
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     
@@ -279,31 +255,45 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     
+    if not args.chunksize > 0:
+        print('\nWARNING:',
+              'Expected chunksize to be a non-zero positive integer.',
+              f'Instead got {args.chunksize}.',
+              'Instead, chunksize=1 will be used')
+        args.chunksize = 1
+    
     if os.path.exists(args.scores):
         print('\nWARNING:',
               f'{args.scores} already exists, it will be overwritten.',
               'Stop the process ASAP to avoid this\n')
     else:
+        # we use this touch to verify dest is a valid path
+        # so that the script does not run if it's not the case
         with open(args.scores, mode="w", encoding='utf8') as f:
-            pass  # touch
+            pass 
 
     # Count co-occurences in the training set
     co_occur = count_co_occurrences(args.frequencies, args.freq_input, args.freq_pos)
     
-    start = time.time()
-    
     print('loading source tables, PoS-tagging and DependencyRelations-tagging')
-    with open(args.input, mode="r", encoding='utf8') as f:
-        tables = [json.loads(line) for line in f if line.strip()]
-    sentences_pos = load_tagged_file(args.pos)
-    sentences_dep = load_tagged_file(args.deprel)
+    tables = FileIterable.from_filename(args.input, fmt='jl')
+    sentences_pos = TaggedFileIterable.from_filename(args.pos)
+    sentences_dep = TaggedFileIterable.from_filename(args.deprel)
     
-    def _deal_with_one_instance(zipped_args):
+    zipped_inputs = [
+        item for item in tqdm.tqdm(
+            zip(tables, sentences_pos, sentences_dep),
+            desc='Reading files',
+            total=len(tables)
+        )
+    ]
+    
+    def deal_with_one_instance(zipped_args):
     
         input_table, input_pos, input_deprel = zipped_args 
 
         scores = build_scores(input_table, co_occur)
-        sentence = build_sentence_object(read_sentence(input_pos, input_deprel))
+        sentence = build_sentence_object(fuse_pos_and_deprel(input_pos, input_deprel))
 
         h = [int(token.pos_ in interesting_tags) for token in sentence]
 
@@ -324,23 +314,16 @@ if __name__ == '__main__':
     
     n_jobs = mp.cpu_count() if args.n_jobs < 0 else args.n_jobs
     print(f'Using {n_jobs} processes, starting now')
-    with mp.Pool(processes=n_jobs) as pool:
-        processed_packages = [item for item in tqdm.tqdm(
-            pool.imap(
-                _deal_with_one_instance, 
-                zip(tables, sentences_pos, sentences_dep),
-                chunksize=args.chunksize if args.chunksize>0 else 1
-            ),
-            total=len(tables)
-        )]
-    
-    print(f'Processing done, serializing results to {args.scores}')
-    with open(args.scores, mode='w', encoding='utf8') as f:
-        for sentence, scores in processed_packages:
+    with open(args.scores, mode="w", encoding='utf8') as f, mp.Pool(processes=n_jobs) as pool:
+        _iterable = pool.imap(
+            deal_with_one_instance, 
+            zipped_inputs,
+            chunksize=args.chunksize
+        )
+        
+        for sentence, scores in tqdm.tqdm(
+            _iterable, total=len(references), desc='Filtering references'):
+            
             for token in sentence:
                 f.write(f'{token.text}\t{scores[token.i]}\n')
             f.write('\n')
-
-    end = time.time()
-    
-    print(f'Done in {datetime.timedelta(seconds=end-start)}')

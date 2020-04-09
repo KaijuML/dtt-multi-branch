@@ -2,93 +2,13 @@
 This scripts filters the references from WikiBIO using our custom token score function
 For now, only token with a score > 0 are kept.
 """
-
+from utils import FileIterable, TaggedFileIterable
 
 import multiprocessing as mp
 
-import more_itertools
-import overrides
 import argparse
 import tqdm
 import os
-
-
-class FileIterable:
-    def __init__(self, iterable):
-        self._iterable = more_itertools.seekable(iterable)
-        self._ptr = 0  # pointer to the next item
-        self._len = None
-        
-    @classmethod
-    def from_file(cls, path, func=None):
-        return cls(cls.read_file(path, func))
-    
-    @staticmethod
-    def read_file(path, func=None):
-        """
-        ARGS:
-            path (str): hopefully a valid path. 
-                        Each line contains a sentence
-                        Tokens are separated by a space ' '
-            func (NoneType): Should be None in this simple case
-        """
-        assert func is None
-        with open(path, mode="r", encoding="utf8") as f:
-            for line in f:
-                yield line.strip().split()
-    
-    def __getitem__(self, n):
-        self._iterable.seek(n)
-        self._ptr = n
-        try:
-            return next(self)
-        except StopIteration:
-            raise IndexError(f'{n} is outside this generator')
-            
-        return ret
-    
-    def __next__(self):
-        self._ptr += 1
-        return next(self._iterable)
-    
-    def __len__(self):
-        if self._len is None:
-            ptr = self._ptr  # remember the position of the pointer
-            length = more_itertools.ilen(self._iterable)  # count remaining items
-            _ = self[ptr - 1]  # set back the pointer
-            self._len = length + ptr
-        return self._len
-
-
-class TaggedFileIterable(FileIterable):
-    
-    @staticmethod
-    @overrides.overrides
-    def read_file(path, func=None):
-        """
-        Accumulate lines until empty line, then yield and do it again
-        ARGS:
-            path (str): hopefully a valid path. 
-                        Each line contains a token and its tag(s)
-                        Sentences are separated by an empty line
-            func (func): will be applied to each line. 
-                         Defaults to identity func `lambda x: x`
-                         Use this to convert tags to correct type
-        """
-        if func is None:
-            def func(*args):
-                return args
-        
-        sentence = list()
-        with open(path, mode='r', encoding='utf8') as f:
-            for line in f:
-                if line.strip():
-                    sentence.append(func(*line.strip().split()))
-                else:
-                    yield sentence
-                    sentence = list()
-        if sentence: 
-            yield sentence
 
 
 if __name__ == '__main__':
@@ -137,8 +57,8 @@ if __name__ == '__main__':
             pass
         
     
-    references = FileIterable.from_file(args.refs)
-    scored_references = TaggedFileIterable.from_file(args.scores, 
+    references = FileIterable.from_filename(args.refs)
+    scored_references = TaggedFileIterable.from_filename(args.scores, 
                                                      func=lambda x, s: (x, float(s)))
     
     zipped_inputs = [
