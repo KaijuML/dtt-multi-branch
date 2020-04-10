@@ -1,8 +1,12 @@
+from utils import TaggedFileIterable
+
 from overrides import overrides
-from tqdm import tqdm
+
+import multiprocessing as mp
 
 import pkg_resources
 import argparse
+import tqdm
 import os
 
 
@@ -85,7 +89,7 @@ class BinaryStrategy(Strategy):
     @overrides
     def _score_weight(self, w):
         """Tokens are either hallucinated or they're not."""
-        return [1, 0] if w=='0' else [0, 1]
+        return [1, 0] if w==0 else [0, 1]
 
 
 class OneBranchStrategy(Strategy):
@@ -113,41 +117,78 @@ strategies = {
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--orig', '-o', dest='orig',
+    
+    group = parser.add_argument_group('Original file and destination path')
+    group.add_argument('--orig', '-o', dest='orig',
                         help='Name of the weights-tagged examples')
-    parser.add_argument('--dest', '-d', dest='dest',
+    group.add_argument('--dest', '-d', dest='dest',
                         help='Name of the resulting file')
     
-    parser.add_argument('--strategy', '-s', dest='strategy',
+    group = parser.add_argument_group('Arguments to create convert strategy')
+    group.add_argument('--strategy', '-s', dest='strategy',
                         choices=list(strategies), default="binary",
                         help='Strategy to format weights.')
-    
-    parser.add_argument('--normalize', dest='normalize', action='store_true',
+    group.add_argument('--normalize', dest='normalize', action='store_true',
                         help='Divide individual weights by the total sum.')
-    
-    parser.add_argument('--weight_regularization', dest='weight_regularization',
+    group.add_argument('--weight_regularization', dest='weight_regularization',
                         type=float, default=0,
                         help='Weights for regularization branch. '
                              'Zero means no branch.')
-    
-    parser.add_argument('--eos_weights', dest='eos_weights', nargs='+',
+    group.add_argument('--eos_weights', dest='eos_weights', nargs='+',
                         type=float, help='Weights to predict </s> token.')
+    
+    group = parser.add_argument_group('Arguments regarding multiprocessing')
+    group.add_argument('--n_jobs', dest='n_jobs', type=int, default=-1,
+                        help='number of processes to use. <0 for cpu_count()')
+    group.add_argument('--chunksize', dest='chunksize', type=int, default=10,
+                        help='chunksize to use in mp.Pool().imap() ' \
+                             'Change this if you know what you are doing.')
 
     args = parser.parse_args()
-
-    folder = pkg_resources.resource_filename(__name__, 'wikibio')
-    orig = os.path.join(folder, args.orig)
-    dest = os.path.join(folder, args.dest)
-
-    assert os.path.exists(orig), f'{orig} is not a valid path!' 
-    nlines = _count_examples(orig)
-
+    
+    if not args.chunksize > 0:
+        print('\nWARNING:',
+              'Expected chunksize to be a non-zero positive integer.',
+              f'Instead got {args.chunksize}.',
+              'Instead, chunksize=1 will be used')
+        args.chunksize = 1
+        
+    if os.path.exists(args.dest):
+        print('\nWARNING:',
+              f'{args.dest} already exists, it will be overwritten.',
+              'Stop the process ASAP to avoid this\n')
+    else:
+        # we use this touch to verify dest is a valid path
+        # so that the script does not run if it's not the case
+        with open(args.dest, mode="w", encoding='utf8') as f:
+            pass 
+    
+    print('Reading orig file. Can take up to a minute.')
+    scored_sentences = [
+        sent for sent in TaggedFileIterable.from_filename(
+            args.orig, func=lambda x,y: (x, float(y)))
+    ]
+    
     strategy = strategies[args.strategy](args.eos_weights, 
                                          args.normalize, 
                                          args.weight_regularization)
+    
+    n_jobs = mp.cpu_count() if args.n_jobs < 0 else args.n_jobs
+    print(f'Using {n_jobs} processes, starting now')
+    with open(args.dest, mode="w", encoding='utf8') as f, mp.Pool(processes=n_jobs) as pool:
+        _iterable = pool.imap(
+            strategy.format_instance, 
+            scored_sentences,
+            chunksize=args.chunksize
+        )
+        
+        for weights in tqdm.tqdm(
+            _iterable, total=len(scored_sentences), desc='Formating weights'):
+            f.write(weights + '\n')
 
-    with open(dest, mode="w", encoding="utf8") as f:
-        for instance in tqdm(read_tagged_file(orig), 
-                             total=nlines,
-                             desc='formating weights'):
-            f.write(strategy.format_instance(instance) + '\n')
+
+    #with open(dest, mode="w", encoding="utf8") as f:
+    #    for instance in tqdm(read_tagged_file(orig), 
+    #                         total=nlines,
+    #                         desc='formating weights'):
+    #        f.write(strategy.format_instance(instance) + '\n')

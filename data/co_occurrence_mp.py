@@ -322,7 +322,7 @@ if __name__ == '__main__':
         )
         
         for sentence, scores in tqdm.tqdm(
-            _iterable, total=len(references), desc='Filtering references'):
+            _iterable, total=len(tables), desc='Scoring references'):
             
             for token in sentence:
                 f.write(f'{token.text}\t{scores[token.i]}\n')
