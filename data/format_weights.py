@@ -48,10 +48,12 @@ class Strategy:
                 which will always be active, to regularize training.
                 This branch is always considered the first branch (index 0)
                 
+        kwargs are there so that all strats are compatible
+                
     In order to implement a new strategy, only the method `_score_weight` should be
     implemented. It should be a function (float --> List[float OR int])    
     """
-    def __init__(self, eos_weights, normalize=False, weight_regularization=0):
+    def __init__(self, eos_weights, normalize=False, weight_regularization=0, **kwargs):
         self.normalize = normalize
         self.weight_regularization = weight_regularization
 
@@ -92,9 +94,36 @@ class BinaryStrategy(Strategy):
         return [1, 0] if w==0 else [0, 1]
 
 
+class ThresholdsStrategy(Strategy):
+    """
+    Activate a branch depending on the importance of the weights
+    For instance, with thresholds [0, 0.5] activate:
+        1st branch when 0
+        2nd when in ]0, 0.5]
+        3rd when in ]0.5, 1]
+        
+    Binary is a special case for thresholds = [0]
+    """
+    
+    @overrides
+    def __init__(self, eos_weights, normalize, weight_regularization, thresholds, **kwargs):
+        super().__init__(eos_weights, normalize, weight_regularization)
+        self.thresholds = thresholds
+        
+    @overrides
+    def _score_weight(self, w):
+        ret = [0] * (len(self.thresholds) + 1)
+        for idx, t in enumerate(self.thresholds):
+            if w <= t:
+                ret[idx] = 1
+                return ret
+        ret[-1] = 1
+        return ret
+
+
 class OneBranchStrategy(Strategy):
     @overrides
-    def __init__(self, eos_weights, normalize, weight_regularization):
+    def __init__(self, eos_weights, normalize, weight_regularization, **kwargs):
         super().__init__(eos_weights, normalize, weight_regularization)
         if not self.eos_weights == [1]:
             raise ValueError('OneBranch strategy should have only one branch, '
@@ -111,6 +140,7 @@ class OneBranchStrategy(Strategy):
 strategies = {
     'binary': BinaryStrategy,
     'one_branch': OneBranchStrategy,
+    'thresholds': ThresholdsStrategy
 }
 
 
@@ -136,6 +166,8 @@ if __name__ == '__main__':
                              'Zero means no branch.')
     group.add_argument('--eos_weights', dest='eos_weights', nargs='+',
                         type=float, help='Weights to predict </s> token.')
+    group.add_argument('--thresholds', dest='thresholds', nargs='+',
+                        type=float, help='thresholds for ThresholdsStrategy.')
     
     group = parser.add_argument_group('Arguments regarding multiprocessing')
     group.add_argument('--n_jobs', dest='n_jobs', type=int, default=-1,
@@ -169,9 +201,12 @@ if __name__ == '__main__':
             args.orig, func=lambda x,y: (x, float(y)))
     ]
     
-    strategy = strategies[args.strategy](args.eos_weights, 
-                                         args.normalize, 
-                                         args.weight_regularization)
+    strategy = strategies[args.strategy](
+        eos_weights=args.eos_weights, 
+        normalize=args.normalize, 
+        weight_regularization=args.weight_regularization,
+        thresholds=args.thresholds
+    )
     
     n_jobs = mp.cpu_count() if args.n_jobs < 0 else args.n_jobs
     print(f'Using {n_jobs} processes, starting now')
@@ -185,10 +220,3 @@ if __name__ == '__main__':
         for weights in tqdm.tqdm(
             _iterable, total=len(scored_sentences), desc='Formating weights'):
             f.write(weights + '\n')
-
-
-    #with open(dest, mode="w", encoding="utf8") as f:
-    #    for instance in tqdm(read_tagged_file(orig), 
-    #                         total=nlines,
-    #                         desc='formating weights'):
-    #        f.write(strategy.format_instance(instance) + '\n')
