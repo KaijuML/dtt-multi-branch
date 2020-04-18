@@ -3,9 +3,22 @@ Where we store everything which is in common between our scripts
 """
 
 import more_itertools
+import itertools
 import overrides
 import json
 import os
+
+
+def nwise(iterable, n=2):
+    """
+    Iterates over iterable n items at a time
+    
+    list(nwise('ABCDE', 3))
+    >>> ['ABC', 'BCD', 'CDE']
+    """
+    iterables = itertools.tee(iterable, n)
+    [next(iterables[i]) for i in range(n) for j in range(i)]
+    return zip(*iterables)
 
 
 class FileIterable:
