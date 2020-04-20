@@ -50,7 +50,7 @@ class Token:
 def ascend_dependency_tree(token):
     while token.dep_ not in ['acl', 'advcl', 'amod', 'appos', 'cc', 'compound', 'conj', 'discourse', 'infmod', 'iobj',
                              'list', 'obj', 'obl', 'orphan', 'partmod', 'prep', 'rcmod', 'relcl']:
-        if token.dep_.upeer() == 'ROOT':
+        if token.dep_.upper() == 'ROOT':
             return None
         token = token.head
     return token
