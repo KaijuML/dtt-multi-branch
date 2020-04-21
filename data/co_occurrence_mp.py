@@ -151,7 +151,7 @@ def fuse_pos_and_deprel(sentence_pos, sentence_dep=None):
         assert _word is None or _word == word, f'<{_word}> vs <{word}>'
         
         # noinspection PyTypeChecker
-        sentence.append((word, tag) + ((rel, int(head)) if _word is not None else ()))
+        sentence.append((word, tag) + ((rel.split(':')[0], int(head)) if _word is not None else ()))
         
     return sentence
 

@@ -142,7 +142,7 @@ def read_sentence(pos_file, deprel_file=None):
             word_check, rel, head = parsed_word.split() if parsed_word else 3 * (None,)
             assert word_check is None or word_check == word
             # noinspection PyTypeChecker
-            sentence.append((word, tag) + ((rel, int(head)) if deprel_file else ()))
+            sentence.append((word, tag) + ((rel.split(':')[0], int(head)) if deprel_file else ()))
         else:
             return sentence
         
