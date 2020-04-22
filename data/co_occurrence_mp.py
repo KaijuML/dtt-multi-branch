@@ -288,7 +288,7 @@ def compute_tf_idf(filename, tables_loc, pos_loc):
             chunksize=args.chunksize)
         tf = dict(tf)
 
-        idf = pool.map_unordered(
+        idf = pool.imap_unordered(
             _idf,
             tqdm.tqdm(all_tokens, desc='IDF'),
             chunksize=args.chunksize)
