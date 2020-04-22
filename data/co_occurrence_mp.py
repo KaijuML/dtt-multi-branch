@@ -223,6 +223,22 @@ def count_co_occurrences(filename, tables_loc, pos_loc):
     return co_occur
 
 
+tf: dict
+idf: dict
+
+
+def _tf_idf(r):
+    return r, {t: tf[r][t] * idf[t] for t in idf.keys()}
+
+
+def _tf(r, cnt):
+    return r, {t: co_occur[r][t] / sum(co_occur[r].values()) for t in cnt.keys()}
+
+
+def _idf(t):
+    return t, math.log2(len(co_occur) / len(list(filter(lambda r: t in co_occur[r].keys(), co_occur))))
+
+
 def compute_tf_idf(filename, tables_loc, pos_loc):
     """
     Count co-occurrences in the training set.
@@ -260,15 +276,8 @@ def compute_tf_idf(filename, tables_loc, pos_loc):
 
     all_tokens = set.union(*[set(cnt.keys()) for cnt in co_occur.values()])
 
-    def _tf(r, cnt):
-        return r, {t: co_occur[r][t] / sum(co_occur[r].values()) for t in cnt.keys()}
-
-    def _idf(t):
-        return t, math.log2(len(co_occur) / len(list(filter(lambda r: t in co_occur[r].keys(), co_occur))))
-
-    def _tf_idf(r):
-        return r, {t: tf[r][t] * idf[t] for t in idf.keys()}
-
+    global tf
+    global idf
     n_jobs = mp.cpu_count() if args.n_jobs < 0 else args.n_jobs
     with mp.Pool(n_jobs) as pool:
         tf = pool.imap_unordered(
