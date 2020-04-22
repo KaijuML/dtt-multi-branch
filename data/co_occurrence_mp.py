@@ -225,13 +225,14 @@ def count_co_occurrences(filename, tables_loc, pos_loc):
 
 tf: dict
 idf: dict
-
+co_occur: dict
 
 def _tf_idf(r):
     return r, {t: tf[r][t] * idf[t] for t in idf.keys()}
 
 
-def _tf(r, cnt):
+def _tf(keyval):
+    r, cnt = keyval
     return r, {t: co_occur[r][t] / sum(co_occur[r].values()) for t in cnt.keys()}
 
 
@@ -259,6 +260,7 @@ def compute_tf_idf(filename, tables_loc, pos_loc):
     sentences = TaggedFileIterable.from_filename(pos_loc)
 
     # Creating co_occur dict
+    global co_occur
     co_occur = dict()
 
     for table, sentence in tqdm.tqdm(zip(tables, sentences),
@@ -298,6 +300,7 @@ def compute_tf_idf(filename, tables_loc, pos_loc):
         tf_idf = dict(tf_idf)
 
     breakpoint()
+    del tf, idf, co_occur
 
     # We cache the resulting dict to save time later
     print(f'Serializing tf-idf dict to {filename}')
