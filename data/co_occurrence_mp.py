@@ -262,20 +262,28 @@ def compute_tf_idf(filename, tables_loc, pos_loc):
 
     n_jobs = mp.cpu_count() if args.n_jobs < 0 else args.n_jobs
     with mp.Pool(n_jobs) as pool:
+        def _tf(r, cnt):
+            return r, {t: co_occur[r][t] / sum(co_occur[r].values()) for t in cnt.keys()}
         tf = pool.imap_unordered(
-            lambda r, cnt: (r, {t: co_occur[r][t] / sum(co_occur[r].values()) for t in cnt.keys()}),
+            _tf,
             tqdm.tqdm(co_occur.items(), desc='TF'),
             chunksize=args.chunksize)
         tf = dict(tf)
+
+        def _idf(t):
+            return t, math.log2(len(co_occur) / len(list(filter(lambda r: t in co_occur[r].keys(), co_occur))))
         idf = pool.map_unordered(
-            lambda t: (t, math.log2(len(co_occur) / len(list(filter(lambda r: t in co_occur[r].keys(), co_occur))))),
+            _idf,
             tqdm.tqdm(all_tokens, desc='IDF'),
             chunksize=args.chunksize)
         idf = dict(idf)
 
-        tf_idf = pool.imap_unordered(lambda r: (r, {t: tf[r][t] * idf[t] for t in idf.keys()}),
+        def _tf_idf(r):
+            return r, {t: tf[r][t] * idf[t] for t in idf.keys()}
+        tf_idf = pool.imap_unordered(_tf_idf,
                                      tqdm.tqdm(tf.keys(), desc='TF-IDF'),
                                      chunksize=args.chunksize)
+        tf_idf = dict(tf_idf)
 
     breakpoint()
 
