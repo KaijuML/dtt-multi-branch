@@ -5,18 +5,15 @@ and Spacy detected in-sentence dependencies.
 from utils import FileIterable, TaggedFileIterable
 
 from collections import Counter
-from functools import partial
 
 import multiprocessing as mp
 
 import itertools
-import datetime
 import argparse
 import tqdm
 import json
-import time
 import os
-
+import math
 
 interesting_tags = ['NOUN', 'ADJ', 'NUM', 'PROPN']
 
@@ -226,6 +223,65 @@ def count_co_occurrences(filename, tables_loc, pos_loc):
     return co_occur
 
 
+def compute_tf_idf(filename, tables_loc, pos_loc):
+    """
+    Count co-occurrences in the training set.
+    """
+
+    # If filename exists, simply returned cached co-occurrences
+    if os.path.exists(filename):
+        print(f'Loading tf-idf from {filename}')
+        with open(filename, mode="r", encoding='utf8') as f:
+            return {
+                tuple(key.split()): value
+                for key, value in json.load(f).items()
+            }
+
+    print('Counting co-occurrences between source tables and target sentences')
+
+    tables = FileIterable.from_filename(tables_loc, fmt='jl')
+    sentences = TaggedFileIterable.from_filename(pos_loc)
+
+    # Creating co_occur dict
+    co_occur = dict()
+
+    for table, sentence in tqdm.tqdm(zip(tables, sentences),
+                                     desc='Counting co-occurrences',
+                                     total=len(tables)):
+
+        for key, values in table:
+            table_items = [(key, value) for value in values]
+            for table_item in table_items:
+                # Only include interestingly tagged tokens that are not equal to the table value
+                # noinspection PyTypeChecker
+                co_occur.setdefault(table_item, Counter()) \
+                    .update([token for token, pos in sentence
+                             if pos in interesting_tags and token != table_item[-1]])
+
+    tokens = set.union(*[cnt.keys() for cnt in co_occur.values()])
+    tf = {r: {t:
+                  co_occur[r][t] / sum(co_occur[r].values())
+              for t in cnt.keys()} for r, cnt in tqdm.tqdm(co_occur.items(), desc='TF')}
+    idf = {t: math.log2(len(co_occur) / len(list(filter(lambda r: t in co_occur[r].keys(), co_occur))))
+           for t in tqdm.tqdm(tokens, desc='IDF')}
+    tf_idf = {r: {t:
+                      tf[r][t] * idf[t]
+                  for t in idf.keys()} for r in tqdm.tqdm(tf.keys(), desc='TF-IDF')}
+    breakpoint()
+
+    # We cache the resulting dict to save time later
+    print(f'Serializing tf-idf dict to {filename}')
+    with open(filename, mode='w', encoding='utf8') as f:
+        json.dump({' '.join(key): val for key, val in tf_idf.items()}, f)
+
+    # TODO sort?
+    # TODO filter rows?
+    # TODO filter row tokens?
+    # TODO convert score?
+
+    return tf_idf
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     
@@ -245,8 +301,12 @@ if __name__ == '__main__':
     group.add_argument('--deprel', '-d', required=True,
                         help='Dependency relations outputs file')
     group.add_argument('--scores', '-s', required=True,
-                        help='Scores file to write')
-    
+                       help='Scores file to write')
+    group.add_argument('--score_type', '-t', choices=['quad', 'tf-idf'], default='quad',
+                       help='How to calculate the scores from co-occurrences: \n'
+                            '\tquad:   quadratic decay from max count (scored 1) to 5 (scored 0)'
+                            '\ttf-idf: term frequency–inverse document frequency (TF-IDF)')
+
     group = parser.add_argument_group('Arguments regarding multiprocessing')
     group.add_argument('--n_jobs', dest='n_jobs', type=int, default=-1,
                         help='number of processes to use. <0 for cpu_count()')
@@ -274,8 +334,11 @@ if __name__ == '__main__':
             pass 
 
     # Count co-occurences in the training set
-    co_occur = count_co_occurrences(args.frequencies, args.freq_input, args.freq_pos)
-    
+    co_occur = {
+        'quad': count_co_occurrences,
+        'tf-idf': compute_tf_idf
+    }[args.score_type](args.frequencies, args.freq_input, args.freq_pos)
+
     print('loading source tables, PoS-tagging and DependencyRelations-tagging')
     tables = FileIterable.from_filename(args.input, fmt='jl')
     sentences_pos = TaggedFileIterable.from_filename(args.pos)
