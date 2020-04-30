@@ -109,6 +109,8 @@ def model_opts(parser):
     # New parameters used in mutli branch decoder
     group.add('--nb_branches', '-nb_branches', type=int, default=2,
               help='Number of branches in multi branch decoder.')
+    group.add('--branch_dropout', '-branch_dropout', type=float, default=.0,
+              help='Probability of using random branch weights for decoding.')
     group.add('--weights_file', '-weights_file', type=str, default='',
               help='Path to the weights used to merge branches in multi branch decodeur')
 

@@ -14,7 +14,7 @@ class MultiBranchRNNDecoder(RNNDecoderBase):
                  hidden_size, nb_branches,
                  attn_type="general", attn_func="softmax",
                  coverage_attn=False, context_gate=None,
-                 copy_attn=False, dropout=0.0, embeddings=None,
+                 copy_attn=False, dropout=0.0, branch_dropout=0.0, embeddings=None,
                  reuse_copy_attn=False, copy_attn_type="general"):
         super(RNNDecoderBase, self).__init__(
             attentional=attn_type != "none" and attn_type is not None)
@@ -24,6 +24,7 @@ class MultiBranchRNNDecoder(RNNDecoderBase):
         self.hidden_size = hidden_size
         self.embeddings = embeddings
         self.dropout = nn.Dropout(dropout)
+        self.branch_dropout = branch_dropout
 
         # Decoder state
         self.state = {}
@@ -74,23 +75,23 @@ class MultiBranchRNNDecoder(RNNDecoderBase):
 
     @classmethod
     def from_opt(cls, opt, embeddings):
-        """Alternate constructor."""
+        """Alternate constructor."""        
         return cls(
-            opt.rnn_type,
-            opt.brnn,
-            opt.dec_layers,
-            opt.dec_rnn_size,
-            opt.nb_branches,
-            opt.global_attention,
-            opt.global_attention_function,
-            opt.coverage_attn,
-            opt.context_gate,
-            opt.copy_attn,
-            opt.dropout[0] if type(opt.dropout) is list
-            else opt.dropout,
-            embeddings,
-            opt.reuse_copy_attn,
-            opt.copy_attn_type)
+            rnn_type=opt.rnn_type,
+            bidirectional_encoder=opt.brnn,
+            num_layers=opt.dec_layers,
+            hidden_size=opt.dec_rnn_size,
+            nb_branches=opt.nb_branches,
+            attn_type=opt.global_attention,
+            attn_func=opt.global_attention_function,
+            coverage_attn=opt.coverage_attn,
+            context_gate=opt.context_gate,
+            copy_attn=opt.copy_attn,
+            dropout=opt.dropout[0] if isinstance(opt.dropout, list) else opt.dropout,
+            branch_dropout=opt.branch_dropout,
+            embeddings=embeddings,
+            reuse_copy_attn=opt.reuse_copy_attn,
+            copy_attn_type=opt.copy_attn_type)
 
     def init_state(self, src, memory_bank, encoder_final):
         """
@@ -163,10 +164,16 @@ class MultiBranchRNNDecoder(RNNDecoderBase):
             for jdx, (rnn, dec_state) in enumerate(zip(self.rnns, dec_states)):
                 tmp_output, tmp_state = rnn(decoder_input, dec_state)
                 new_states.append(tmp_state)
+                
+                # randomize weights with self.branch_dropout probability
+                w = weights[idx, :, jdx:jdx+1]
+                if torch.rand(1) < self.branch_dropout:
+                    w = torch.rand(w.shape).mul(5).softmax(-1)
+                    
                 if jdx == 0:
-                    rnn_output = weights[idx, :, jdx:jdx+1] * tmp_output
+                    rnn_output = w * tmp_output
                 else:
-                    rnn_output += weights[idx, :, jdx:jdx+1] * tmp_output
+                    rnn_output += w * tmp_output
 
             dec_states = new_states
                     
