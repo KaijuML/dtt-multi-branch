@@ -47,3 +47,31 @@ Training needs a preprocessing step:
 Now that the preprocessing step is done, we can train a model using:
 
 `python run_onmt.py --train --config train.cfg`
+
+
+# Evaluation
+
+### BLEU
+TODO
+
+### PARENT
+TODO
+
+### Sum of hallucination scores
+TODO
+
+### Readability tests
+We perform 7 classic readability tests:
+ * [Kincaid](https://en.wikipedia.org/wiki/Flesch%E2%80%93Kincaid_readability_tests)
+ * [ARI](https://en.wikipedia.org/wiki/Automated_readability_index)
+ * [Coleman-Liau](https://en.wikipedia.org/wiki/Coleman%E2%80%93Liau_index)
+ * [Flesch Index](https://en.wikipedia.org/wiki/Flesch%E2%80%93Kincaid_readability_tests)
+ * [Fog Index](https://en.wikipedia.org/wiki/Gunning_fog_index)
+ * [Lix](https://en.wikipedia.org/wiki/Lix_(readability_test))
+ * [SMOG-Grading](https://en.wikipedia.org/wiki/SMOG)
+
+Such values are computed using the [GNU diction/style tool](https://www.gnu.org/software/diction/) as follows:
+```bash
+cat $OUTPUT_FILE | sed -e 's/-lrb-/(/' -e 's/-rrb-/)/' -e 's/--/-/' -e "s/''/\"/" -e 's/``/"/' -e 's/./\u&/' | style
+```
+
