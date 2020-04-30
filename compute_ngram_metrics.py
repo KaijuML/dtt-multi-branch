@@ -16,8 +16,6 @@ def read_files(_args):
             _tables.append(json.loads(table))
             _references.append([reference.split()])
             _hypotheses.append(hypothesis.split())
-            if len(_tables) > 1000:
-                break
     _tables = list(map(lambda tab: [([row[0]], row[1]) for row in tab], _tables))
     return _tables, _references, _hypotheses
 
