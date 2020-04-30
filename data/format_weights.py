@@ -121,6 +121,18 @@ class ThresholdsStrategy(Strategy):
         return ret
 
 
+class ContinousThresholdStrategy(ThresholdsStrategy):
+    @overrides
+    def _score_weight(self, w):
+        ret = [0] * (len(self.thresholds) + 1)
+        for idx, t in enumerate(self.thresholds):
+            if w >= t:
+                ret[idx] = 1
+            else:
+                break
+        return ret
+
+
 class OneBranchStrategy(Strategy):
     @overrides
     def __init__(self, eos_weights, normalize, weight_regularization, **kwargs):
@@ -140,7 +152,8 @@ class OneBranchStrategy(Strategy):
 strategies = {
     'binary': BinaryStrategy,
     'one_branch': OneBranchStrategy,
-    'thresholds': ThresholdsStrategy
+    'thresholds': ThresholdsStrategy,
+    'continous': ContinousThresholdStrategy
 }
 
 
