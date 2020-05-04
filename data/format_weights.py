@@ -124,13 +124,8 @@ class ThresholdsStrategy(Strategy):
 class ContinousThresholdStrategy(ThresholdsStrategy):
     @overrides
     def _score_weight(self, w):
-        ret = [0] * (len(self.thresholds) + 1)
-        for idx, t in enumerate(self.thresholds):
-            if w >= t:
-                ret[idx] = 1
-            else:
-                break
-        return ret
+        n_ones = sum(w > t for t in self.thresholds) + 1
+        return [1 if k < n_ones else 0 for k in range(len(self.thresholds)+1)]
 
 
 class OneBranchStrategy(Strategy):
