@@ -51,14 +51,21 @@ Now that the preprocessing step is done, we can train a model using:
 
 # Evaluation
 
-### BLEU
-TODO
-
-### PARENT
-TODO
+### BLEU and  PARENT
+We evaluate using the [BLEU](https://www.aclweb.org/anthology/P02-1040.pdf) classic metric and
+[PARENT](https://www.aclweb.org/anthology/P19-1483.pdf), which his more suitable for the table-to-text generation task.
+Those n-gram based metrics can be computed as follows:
+```bash
+python3 compute_ngram_metrics.py data/wikibio/test_tables.jl data/wikibio/test_output.txt $OUTPUT_FILE
+```
 
 ### Sum of hallucination scores
-TODO
+We can easily generate token-level hallucination score file in the same way we did for the training data (see the
+`data/README.md` file for details). Once obtained the `$OUTPUT_SCORES` file, we compute the mean of the sentence-level
+sum of the hallucination scores:
+```bash
+python3 data/avg_hallucination_sum.py $OUTPUT_SCORES
+```
 
 ### Readability tests
 We perform 7 classic readability tests:
