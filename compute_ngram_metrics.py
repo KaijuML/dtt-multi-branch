@@ -2,9 +2,9 @@ import argparse
 import json
 
 from nltk.translate.bleu_score import corpus_bleu
-from tqdm import tqdm
-
+from data.utils import FileIterable
 from parent import parent
+from tqdm import tqdm
 
 
 def read_files(_args):
@@ -19,6 +19,9 @@ def read_files(_args):
     _tables = list(map(lambda tab: [([row[0]], row[1]) for row in tab], _tables))
     return _tables, _references, _hypotheses
 
+def _corpus_bleu(hypotheses, references, tables):
+    return corpus_bleu([[ref] for ref in references], hypotheses)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Compute BLEU and PARENT metrics.')
@@ -27,16 +30,27 @@ if __name__ == '__main__':
     parser.add_argument('hypotheses')
 
     args = parser.parse_args()
-
-    tables, references, hypotheses = read_files(args)
+    
+    tables = FileIterable.from_filename(args.tables, fmt='jl')
+    references = FileIterable.from_filename(args.references, fmt='txt')
+    hypotheses = FileIterable.from_filename(args.hypotheses, fmt='txt')
+    
+    zipped_inputs = [
+        item for item in tqdm.tqdm(
+            zip(hypotheses, references, tables),
+            desc='Reading files',
+            total=len(tables)
+        )
+    ]
+    
 
     print('Computing BLEU... ', end='')
-    bleu = corpus_bleu(references, hypotheses)
+    bleu = _corpus_bleu(*zipped_input)
     print('OK')
 
     print('Computing PARENT... ', end='')
     references = [r[0] for r in references]
-    parent_p, parent_r, parent_f = parent(hypotheses, references, tables)
+    parent_p, parent_r, parent_f = parent(*zipped_input)
     print('OK')
 
     print(f'\n{args.hypotheses}:\nBLEU\t{bleu:.4f}\n'
