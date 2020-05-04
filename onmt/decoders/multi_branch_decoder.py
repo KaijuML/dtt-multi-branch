@@ -168,7 +168,7 @@ class MultiBranchRNNDecoder(RNNDecoderBase):
                 # randomize weights with self.branch_dropout probability
                 w = weights[idx, :, jdx:jdx+1]
                 if torch.rand(1) < self.branch_dropout:
-                    w = torch.rand(w.shape).mul(5).softmax(-1)
+                    w = torch.rand(w.shape).mul(5).softmax(-1).to(weights.device)
                     
                 if jdx == 0:
                     rnn_output = w * tmp_output
