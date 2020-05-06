@@ -1,19 +1,26 @@
 """
 Creates the hallucination score file {subset}_h.txt, using information from PoS tags (assumed in {subset}_pos.txt)
-and Spacy detected in-sentence dependencies.
+and in-sentence dependencies.
 """
-from utils import FileIterable, TaggedFileIterable
-
-from collections import Counter
-
-import multiprocessing as mp
-
-import itertools
 import argparse
-import tqdm
+import itertools
 import json
+import multiprocessing as mp
 import os
-import math
+from collections import Counter, deque
+from statistics import mean
+
+import tqdm
+
+from data.utils import FileIterable, TaggedFileIterable
+
+tok_mapping = {
+    '-lrb-': '(',
+    '-rrb-': ')',
+    '--': '-',
+    '``': '"',
+    "''": '"',
+}
 
 interesting_tags = ['NOUN', 'ADJ', 'NUM', 'PROPN']
 
@@ -33,15 +40,26 @@ class Token:
         if name == 'head' and value:
             value.children.add(self)
 
-    @property
-    def subtree(self):
+    def subtree(self, condition=lambda _: True, preserve_children=False):
+        """
+
+        Args:
+            condition: used to filter out some branches
+            preserve_children: whether to keep the root of filtered out branches or not
+
+        Returns: The subtree of this token according to the dependency relations
+
+        """
         s = {self}
         for c in self.children:
-            s.update(c.subtree)
+            if condition(c):
+                s.update(c.subtree(condition=condition, preserve_children=preserve_children))
+            elif preserve_children:
+                s.add(c)
         return s
 
     def __repr__(self):
-        return self.text
+        return f'{self.i}.{self.text}'
 
 
 def ascend_dependency_tree(token):
@@ -51,6 +69,44 @@ def ascend_dependency_tree(token):
             return None
         token = token.head
     return token
+
+
+def avg_expand(sentence, h):
+    def condition(c):
+        return c.dep_ not in ['acl', 'advcl', 'amod', 'appos', 'ccomp', 'conj', 'csubj', 'iobj', 'list', 'nmod',
+                              'nsubj', 'obj', 'obl', 'orphan', 'parataxis', 'reparandum', 'vocative', 'xcomp']
+
+    # The queue used to traverse the sentence tree, from the leaves to the root
+    nodes = deque(filter(lambda t: len(t.children) == 0, sentence))
+    # A tabu set of the nodes not to add to the queue
+    done = set()
+    # Traversing the whole tree
+    while len(nodes) > 0:
+        # Extract a node from the queue
+        node = nodes.popleft()
+        # Ensure all the descendants have been processed
+        if any(c != node and c not in done for c in node.subtree()):
+            nodes.append(node)
+            continue
+
+        # part of subtree used to compute the mean score that will be expanded
+        src = set(filter(lambda c: c.pos_ in interesting_tags,
+                         node.subtree(condition=condition, preserve_children=True)))
+        # part of subtree that will be updated
+        tgt = node.subtree(condition=condition)
+
+        # If it's useful...
+        if (len(src) > 0 and len(tgt) > 0) and not (len(src) == 1 and src == tgt):
+            # compute the mean
+            updated_score = mean(h[c.i] for c in src)
+            # assign it to the filtered subtree
+            for n in tgt:
+                h[n.i] = updated_score
+
+        # Updates the queue and the tabu list
+        if node.head and node.head not in nodes and node.head not in done:
+            nodes.append(node.head)
+        done.add(node)
 
 
 def build_sentence_object(token_list):
@@ -64,16 +120,17 @@ def build_sentence_object(token_list):
     return sentence
 
 
-def expand(token, h):
+def max_expand(sentence, h):
     """
     Expands an hallucinated token
     i.e. tags the related (according to the dependence tree) tokens as hallucinations too
     """
-    ancestor = ascend_dependency_tree(token)
-    if ancestor:
-        for t in ancestor.subtree:
-            if t.pos_ not in interesting_tags:
-                h[t.i] = max(h[t.i], h[token.i])
+    for token in sentence:
+        if token.pos_ in interesting_tags and h[token.i]:
+            if ancestor := ascend_dependency_tree(token):
+                for t in ancestor.subtree():
+                    if t.pos_ not in interesting_tags:
+                        h[t.i] = max(h[t.i], h[token.i])
 
 
 def build_scores(table, co_occur):
@@ -145,8 +202,8 @@ def fuse_pos_and_deprel(sentence_pos, sentence_dep=None):
     for (word, tag), (_word, rel, head) in zip(sentence_pos, sentence_dep):
         
         # sanity check
-        assert _word is None or _word == word, f'<{_word}> vs <{word}>'
-        
+        assert _word is None or tok_mapping.get(_word, _word) == tok_mapping.get(word, word), f'<{_word}> vs <{word}>'
+
         # noinspection PyTypeChecker
         sentence.append((word, tag) + ((rel.split(':')[0], int(head)) if _word is not None else ()))
         
@@ -223,98 +280,6 @@ def count_co_occurrences(filename, tables_loc, pos_loc):
     return co_occur
 
 
-tf: dict
-idf: dict
-co_occur: dict
-
-def _tf_idf(r):
-    return r, {t: tf[r][t] * idf[t] for t in idf.keys()}
-
-
-def _tf(keyval):
-    r, cnt = keyval
-    return r, {t: co_occur[r][t] / sum(co_occur[r].values()) for t in cnt.keys()}
-
-
-def _idf(t):
-    return t, math.log2(len(co_occur) / len(list(filter(lambda r: t in co_occur[r].keys(), co_occur))))
-
-
-def compute_tf_idf(filename, tables_loc, pos_loc):
-    """
-    Count co-occurrences in the training set.
-    """
-
-    # If filename exists, simply returned cached co-occurrences
-    if os.path.exists(filename):
-        print(f'Loading tf-idf from {filename}')
-        with open(filename, mode="r", encoding='utf8') as f:
-            return {
-                tuple(key.split()): value
-                for key, value in json.load(f).items()
-            }
-
-    print('Counting co-occurrences between source tables and target sentences')
-
-    tables = FileIterable.from_filename(tables_loc, fmt='jl')
-    sentences = TaggedFileIterable.from_filename(pos_loc)
-
-    # Creating co_occur dict
-    global co_occur
-    co_occur = dict()
-
-    for table, sentence in tqdm.tqdm(zip(tables, sentences),
-                                     desc='Counting co-occurrences',
-                                     total=len(tables)):
-
-        for key, values in table:
-            table_items = [(key, value) for value in values]
-            for table_item in table_items:
-                # Only include interestingly tagged tokens that are not equal to the table value
-                # noinspection PyTypeChecker
-                co_occur.setdefault(table_item, Counter()) \
-                    .update([token for token, pos in sentence
-                             if pos in interesting_tags and token != table_item[-1]])
-
-    all_tokens = set.union(*[set(cnt.keys()) for cnt in co_occur.values()])
-
-    global tf
-    global idf
-    n_jobs = mp.cpu_count() if args.n_jobs < 0 else args.n_jobs
-    with mp.Pool(n_jobs) as pool:
-        tf = pool.imap_unordered(
-            _tf,
-            tqdm.tqdm(co_occur.items(), desc='TF'),
-            chunksize=args.chunksize)
-        tf = dict(tf)
-
-        idf = pool.imap_unordered(
-            _idf,
-            tqdm.tqdm(all_tokens, desc='IDF'),
-            chunksize=args.chunksize)
-        idf = dict(idf)
-
-        tf_idf = pool.imap_unordered(_tf_idf,
-                                     tqdm.tqdm(tf.keys(), desc='TF-IDF'),
-                                     chunksize=args.chunksize)
-        tf_idf = dict(tf_idf)
-
-    breakpoint()
-    del tf, idf, co_occur
-
-    # We cache the resulting dict to save time later
-    print(f'Serializing tf-idf dict to {filename}')
-    with open(filename, mode='w', encoding='utf8') as f:
-        json.dump({' '.join(key): val for key, val in tf_idf.items()}, f)
-
-    # TODO sort?
-    # TODO filter rows?
-    # TODO filter row tokens?
-    # TODO convert score?
-
-    return tf_idf
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     
@@ -335,10 +300,8 @@ if __name__ == '__main__':
                         help='Dependency relations outputs file')
     group.add_argument('--scores', '-s', required=True,
                        help='Scores file to write')
-    group.add_argument('--score_type', '-t', choices=['quad', 'tf-idf'], default='quad',
-                       help='How to calculate the scores from co-occurrences: \n'
-                            '\tquad:   quadratic decay from max count (scored 1) to 5 (scored 0)'
-                            '\ttf-idf: term frequency–inverse document frequency (TF-IDF)')
+    group.add_argument('--expand', '-e', choices=['avg', 'max'], default='avg',
+                       help='Scores file to write')
 
     group = parser.add_argument_group('Arguments regarding multiprocessing')
     group.add_argument('--n_jobs', dest='n_jobs', type=int, default=-1,
@@ -367,10 +330,7 @@ if __name__ == '__main__':
             pass 
 
     # Count co-occurences in the training set
-    co_occur = {
-        'quad': count_co_occurrences,
-        'tf-idf': compute_tf_idf
-    }[args.score_type](args.frequencies, args.freq_input, args.freq_pos)
+    co_occur = count_co_occurrences(args.frequencies, args.freq_input, args.freq_pos)
 
     print('loading source tables, PoS-tagging and DependencyRelations-tagging')
     tables = FileIterable.from_filename(args.input, fmt='jl')
@@ -392,17 +352,16 @@ if __name__ == '__main__':
         scores = build_scores(input_table, co_occur)
         sentence = build_sentence_object(fuse_pos_and_deprel(input_pos, input_deprel))
 
-        h = [int(token.pos_ in interesting_tags) for token in sentence]
+        h = [float(token.pos_ in interesting_tags) for token in sentence]
 
-        # Score each token
+        # Score interesting tokens
         for token in sentence:
-            if h[token.i]:
+            if token.pos_ in interesting_tags:
                 h[token.i] -= scores.get(token.text, 0)
 
-        # expand the hallucination scores
-        for token in sentence:
-            if token.pos_ in interesting_tags and h[token.i] > 0:
-                expand(token, h)
+        # Expand the hallucination scores according to the chosen strategy
+        {'max': max_expand,
+         'avg': avg_expand}[args.expand](sentence, h)
 
         # Some tricks to harmonize the scoring
         handle_sentence_punctuation(sentence, h)
