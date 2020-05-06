@@ -116,7 +116,10 @@ def build_sentence_object(token_list):
     for token in sentence:
         token.pos_ = token_list[token.i][1]
         token.dep_ = token_list[token.i][2]
-        token.head = None if token.dep_.upper() == 'ROOT' else sentence[token_list[token.i][3]]
+        try:
+            token.head = None if token.dep_.upper() == 'ROOT' else sentence[token_list[token.i][3]]
+        except IndexError:
+            token.head = sentence[0]
     return sentence
 
 
