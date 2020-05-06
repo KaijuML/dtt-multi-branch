@@ -7,19 +7,7 @@ from parent import parent
 from tqdm import tqdm
 
 
-def read_files(_args):
-    _tables, _references, _hypotheses = [], [], []
-    with open(_args.tables) as tables_file, open(_args.references) as references_file, \
-            open(args.hypotheses) as hypotheses_file:
-        for table, reference, hypothesis in tqdm(
-                zip(tables_file, references_file, hypotheses_file), desc='Reading files', unit='lines'):
-            _tables.append(json.loads(table))
-            _references.append([reference.split()])
-            _hypotheses.append(hypothesis.split())
-    _tables = list(map(lambda tab: [([row[0]], row[1]) for row in tab], _tables))
-    return _tables, _references, _hypotheses
-
-def _corpus_bleu(hypotheses, references, tables):
+def _corpus_bleu(hypotheses, references, _):
     return corpus_bleu([[ref] for ref in references], hypotheses)
 
 
@@ -36,7 +24,7 @@ if __name__ == '__main__':
     hypotheses = FileIterable.from_filename(args.hypotheses, fmt='txt')
     
     zipped_inputs = [
-        item for item in tqdm.tqdm(
+        item for item in tqdm(
             zip(hypotheses, references, tables),
             desc='Reading files',
             total=len(tables)
@@ -45,12 +33,12 @@ if __name__ == '__main__':
     
 
     print('Computing BLEU... ', end='')
-    bleu = _corpus_bleu(*zipped_input)
+    bleu = _corpus_bleu(*zip(*zipped_inputs))
     print('OK')
 
     print('Computing PARENT... ', end='')
     references = [r[0] for r in references]
-    parent_p, parent_r, parent_f = parent(*zipped_input)
+    parent_p, parent_r, parent_f = parent(*zip(*zipped_inputs))
     print('OK')
 
     print(f'\n{args.hypotheses}:\nBLEU\t{bleu:.4f}\n'
