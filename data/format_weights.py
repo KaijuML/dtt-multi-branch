@@ -92,6 +92,13 @@ class BinaryStrategy(Strategy):
     def _score_weight(self, w):
         """Tokens are either hallucinated or they're not."""
         return [1, 0] if w==0 else [0, 1]
+    
+
+class SoftBinaryStrategy(Strategy):
+    @overrides
+    def _score_weight(self, w):
+        """Soft version of BinaryStrategy."""
+        return [1 - w, w]
 
 
 class ThresholdsStrategy(Strategy):
@@ -146,6 +153,7 @@ class OneBranchStrategy(Strategy):
 
 strategies = {
     'binary': BinaryStrategy,
+    'soft_binary': SoftBinaryStrategy,
     'one_branch': OneBranchStrategy,
     'thresholds': ThresholdsStrategy,
     'continous': ContinousThresholdStrategy
