@@ -58,15 +58,31 @@ class FileIterable:
             for line in f:
                 yield _read_line(line)
     
-    def __getitem__(self, n):
-        self._iterable.seek(n)
-        self._ptr = n
-        try:
-            return next(self)
-        except StopIteration:
-            raise IndexError(f'{n} is outside this generator')
-            
-        return ret
+
+    def __getitem__(self, item):
+        if isinstance(item, slice):
+            # unpack the slice manually
+            start = item.start if item.start else 0
+            stop = item.stop if item.stop else 0
+            step = item.step if item.step else 1
+
+            return self[range(start, stop, step)]
+        elif isinstance(item, range):
+            return [self[i] for i in item]
+        elif isinstance(item, (list, tuple)):
+            assert all(isinstance(i, int) for i in item)
+            return [self[i] for i in item]
+        elif isinstance(item, int):
+            self._iterable.seek(item)
+            self._ptr = item
+            try:
+                return next(self)
+            except StopIteration:
+                raise IndexError(f'{item} is outside this generator')
+            return ret
+        else:
+            raise ValueError(f'Can get item {item} of type {type(item)}. '
+                             'This class only supports slices/list[int]/tuple[int]/int.')
     
     def __next__(self):
         self._ptr += 1
