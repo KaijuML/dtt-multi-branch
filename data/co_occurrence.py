@@ -1,15 +1,26 @@
 """
 Creates the hallucination score file {subset}_h.txt, using information from PoS tags (assumed in {subset}_pos.txt)
-and Spacy detected in-sentence dependencies.
+and in-sentence dependencies.
 """
-from collections import Counter
-from tqdm import tqdm, trange
-from os.path import exists
-
 import argparse
+import itertools
 import json
+import multiprocessing as mp
 import os
+from collections import Counter, deque
+from statistics import mean
 
+import tqdm
+
+from data.utils import FileIterable, TaggedFileIterable
+
+tok_mapping = {
+    '-lrb-': '(',
+    '-rrb-': ')',
+    '--': '-',
+    '``': '"',
+    "''": '"',
+}
 
 interesting_tags = ['NOUN', 'ADJ', 'NUM', 'PROPN']
 
@@ -29,15 +40,26 @@ class Token:
         if name == 'head' and value:
             value.children.add(self)
 
-    @property
-    def subtree(self):
+    def subtree(self, condition=lambda _: True, preserve_children=False):
+        """
+
+        Args:
+            condition: used to filter out some branches
+            preserve_children: whether to keep the root of filtered out branches or not
+
+        Returns: The subtree of this token according to the dependency relations
+
+        """
         s = {self}
         for c in self.children:
-            s.update(c.subtree)
+            if condition(c):
+                s.update(c.subtree(condition=condition, preserve_children=preserve_children))
+            elif preserve_children:
+                s.add(c)
         return s
 
     def __repr__(self):
-        return self.text
+        return f'{self.i}.{self.text}'
 
 
 def ascend_dependency_tree(token):
@@ -49,6 +71,44 @@ def ascend_dependency_tree(token):
     return token
 
 
+def avg_expand(sentence, h):
+    def condition(c):
+        return c.dep_ not in ['acl', 'advcl', 'amod', 'appos', 'ccomp', 'conj', 'csubj', 'iobj', 'list', 'nmod',
+                              'nsubj', 'obj', 'obl', 'orphan', 'parataxis', 'reparandum', 'vocative', 'xcomp']
+
+    # The queue used to traverse the sentence tree, from the leaves to the root
+    nodes = deque(filter(lambda t: len(t.children) == 0, sentence))
+    # A tabu set of the nodes not to add to the queue
+    done = set()
+    # Traversing the whole tree
+    while len(nodes) > 0:
+        # Extract a node from the queue
+        node = nodes.popleft()
+        # Ensure all the descendants have been processed
+        if any(c != node and c not in done for c in node.subtree()):
+            nodes.append(node)
+            continue
+
+        # part of subtree used to compute the mean score that will be expanded
+        src = set(filter(lambda c: c.pos_ in interesting_tags,
+                         node.subtree(condition=condition, preserve_children=True)))
+        # part of subtree that will be updated
+        tgt = node.subtree(condition=condition)
+
+        # If it's useful...
+        if (len(src) > 0 and len(tgt) > 0) and not (len(src) == 1 and src == tgt):
+            # compute the mean
+            updated_score = mean(h[c.i] for c in src)
+            # assign it to the filtered subtree
+            for n in tgt:
+                h[n.i] = updated_score
+
+        # Updates the queue and the tabu list
+        if node.head and node.head not in nodes and node.head not in done:
+            nodes.append(node.head)
+        done.add(node)
+
+
 def build_sentence_object(token_list):
     # __init__
     sentence = [Token(i, t[0]) for i, t in enumerate(token_list)]
@@ -56,20 +116,24 @@ def build_sentence_object(token_list):
     for token in sentence:
         token.pos_ = token_list[token.i][1]
         token.dep_ = token_list[token.i][2]
-        token.head = None if token.dep_.upper() == 'ROOT' else sentence[token_list[token.i][3]]
+        try:
+            token.head = None if token.dep_.upper() == 'ROOT' else sentence[token_list[token.i][3]]
+        except IndexError:
+            token.head = sentence[0]
     return sentence
 
 
-def expand(token, h):
+def max_expand(sentence, h):
     """
     Expands an hallucinated token
     i.e. tags the related (according to the dependence tree) tokens as hallucinations too
     """
-    ancestor = ascend_dependency_tree(token)
-    if ancestor:
-        for t in ancestor.subtree:
-            if t.pos_ not in interesting_tags:
-                h[t.i] = max(h[t.i], h[token.i])
+    for token in sentence:
+        if token.pos_ in interesting_tags and h[token.i]:
+            if ancestor := ascend_dependency_tree(token):
+                for t in ancestor.subtree():
+                    if t.pos_ not in interesting_tags:
+                        h[t.i] = max(h[t.i], h[token.i])
 
 
 def build_scores(table, co_occur):
@@ -82,19 +146,18 @@ def build_scores(table, co_occur):
     Returns: The table's token hallucination inverse score dictionary
 
     """
-    # [[<key_0>, [<token_00>, ..., <token_0m>]], ..., [<key_n>, [<token_n0>, ..., <token_nm>]]]
-    table = json.loads(table)
-    # {<key_0>, <token_00>, ..., <token_0m>, <key_1>, ..., <token_nm>}
-    tokens_in_table = set(sum([[key_val[0]] + key_val[1] for key_val in table], []))
+    
+    # flatten the table --> {<key_0>, <token_00>, ..., <token_0m>, <key_1>, ..., <token_nm>}
+    tokens_in_table = set(itertools.chain(*[[key] + val for key, val in table]))
 
     # scores assigns 1 to all the table keys and values
     scores = {t: 1 for t in tokens_in_table}
 
     # scores assigns a proper value to the table rows' co-occurrences
-    for table_key, table_values in table:
-        for table_value in table_values:
-            table_tuple = (table_key, table_value)
-            for token, score in co_occur.get(table_tuple, {}).items():
+    for key, values in table:
+        for val in values:
+            table_tuple = key, val
+            for token, score in co_occur.get(table_tuple, dict()).items():
                 scores[token] = max(score, scores.get(token, 0))
     return scores
 
@@ -132,20 +195,23 @@ def handle_sentence_punctuation(sentence, h):
                 h[j] = min_h
 
 
-def read_sentence(pos_file, deprel_file=None):
-    sentence = []
-    while True:
-        tagged_word = pos_file.readline()
-        parsed_word = deprel_file.readline() if deprel_file else None
-        if tagged_word.strip():
-            word, tag = tagged_word.split()
-            word_check, rel, head = parsed_word.split() if parsed_word else 3 * (None,)
-            assert word_check is None or word_check == word
-            # noinspection PyTypeChecker
-            sentence.append((word, tag) + ((rel.split(':')[0], int(head)) if deprel_file else ()))
-        else:
-            return sentence
+def fuse_pos_and_deprel(sentence_pos, sentence_dep=None):
+    sentence = list()
+    if sentence_dep is None:
+        sentence_dep = [[None, None, None] for _ in range(len(sentence_pos))]
+
+    assert len(sentence_pos) == len(sentence_dep), sentence_pos + ['//'] + sentence_dep
         
+    for (word, tag), (_word, rel, head) in zip(sentence_pos, sentence_dep):
+        
+        # sanity check
+        assert _word is None or tok_mapping.get(_word, _word) == tok_mapping.get(word, word), f'<{_word}> vs <{word}>'
+
+        # noinspection PyTypeChecker
+        sentence.append((word, tag) + ((rel.split(':')[0], int(head)) if _word is not None else ()))
+        
+    return sentence
+
 
 def count_co_occurrences(filename, tables_loc, pos_loc):
     """
@@ -154,46 +220,45 @@ def count_co_occurrences(filename, tables_loc, pos_loc):
     
     # If filename exists, simply returned cached co-occurrences
     if os.path.exists(filename):
+        print(f'Loading co-occurrences counts from {filename}')
         with open(filename, mode="r", encoding='utf8') as f:
             return {
                 tuple(key.split()): value
                 for key, value in json.load(f).items()
             }
+
+    print('Counting co-occurrences between source tables and target sentences')
         
-    
-    # Counting number of examples (by counting number of tables)
-    num_examples = int(os.popen(f'wc -l < {tables_loc}').read())
+    tables = FileIterable.from_filename(tables_loc, fmt='jl')
+    sentences = TaggedFileIterable.from_filename(pos_loc)
     
     # Creating co_occur dict
     co_occur = dict()
-    
-    with open(tables_loc, mode="r", encoding='utf8') as tables_file, \
-         open(pos_loc, mode="r", encoding="utf8") as refs_file:
-        
-        for _ in trange(num_examples, desc='Counting co-occurrences'):
-            
-            # reading the next example from both input/output files
-            table = json.loads(tables_file.readline())  # source table
-            sentence = read_sentence(refs_file)         # target sentence
-            
-            for key, values in table:
-                table_items = [(key, value) for value in values]
-                for table_item in table_items:
-                    # Only include interestingly tagged tokens that are not equal to the table value
-                    # noinspection PyTypeChecker
-                    co_occur.setdefault(table_item, Counter()) \
-                        .update([token for token, pos in sentence
-                                 if pos in interesting_tags and token != table_item[-1]])
 
+    for table, sentence in tqdm.tqdm(zip(tables, sentences), 
+                         desc='Counting co-occurrences', 
+                         total=len(tables)):
+
+        for key, values in table:
+            table_items = [(key, value) for value in values]
+            for table_item in table_items:
+                # Only include interestingly tagged tokens that are not equal to the table value
+                # noinspection PyTypeChecker
+                co_occur.setdefault(table_item, Counter()) \
+                    .update([token for token, pos in sentence
+                             if pos in interesting_tags and token != table_item[-1]])
+    
     # We filter the co_occur dictionary.
     # We keep only elements whose total co_occurrences number is in the 5th percentile
     # We also convert raw counts to normalized scores in [0, 1]
     
+    print('Sorting keys')
     sorted_keys = sorted(
         co_occur, 
         key=lambda x: max(co_occur[x].values()) if len(co_occur[x]) else 0,
         reverse=True
-    )
+    )[1:]  # I remove the first key because I have manually seen that it's useless
+    print('Key are sorted')
     
     co_occur = {
         key: {
@@ -202,9 +267,9 @@ def count_co_occurrences(filename, tables_loc, pos_loc):
             if c > 5
         }
         # we iterate through all keys
-        for idx, key in tqdm(enumerate(sorted_keys), 
-                             desc='Extracting common co-occurrences',
-                             total=len(sorted_keys))
+        for idx, key in tqdm.tqdm(enumerate(sorted_keys), 
+                                  desc='Extracting common co-occurrences',
+                                  total=len(sorted_keys))
         
         # we only keep the top 5th percentile
         if idx / len(sorted_keys) < 0.05
@@ -217,59 +282,107 @@ def count_co_occurrences(filename, tables_loc, pos_loc):
 
     return co_occur
 
-def main():
-    
-    # Count co-occurences in the training set
-    co_occur = count_co_occurrences(args.frequencies, args.freq_input, args.freq_pos)
-    
-    return
-    
-    # Score each sentence token, according to the corresponding table and its co-occurrences
-    with open(args.input) as tables_file, open(args.scores, 'w') as hallucination_file, \
-            open(args.pos) as pos_file, open(args.deprel) as deprel_file:
-
-        num_examples = int(os.popen(f'wc -l < {args.input}').read())
-        for i, table in tqdm(enumerate(tables_file), desc='Scoring tokens', total=num_examples):
-            scores = build_scores(table, co_occur)
-            sentence = build_sentence_object(read_sentence(pos_file, deprel_file))
-            h = [int(token.pos_ in interesting_tags) for token in sentence]
-
-            # Score each token
-            for token in sentence:
-                if h[token.i]:
-                    h[token.i] -= scores.get(token.text, 0)
-
-            # expand the hallucination scores
-            for token in sentence:
-                if token.pos_ in interesting_tags and h[token.i] > 0:
-                    expand(token, h)
-
-            # Some tricks to harmonize the scoring
-            handle_sentence_punctuation(sentence, h)
-
-            # Write output to file {set}_h.txt
-            for token in sentence:
-                hallucination_file.write(f'{token.text}\t{h[token.i]}\n')
-            hallucination_file.write('\n')
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--frequencies', '-f', required=True,
+    
+    group = parser.add_argument_group('Arguments to parametrize the co-occurrences count')
+    group.add_argument('--frequencies', '-f', required=True,
                         help='Cached file containing filtered co-occurrences dict. '
                              'If it does not exists, it will be used to store the co-occurrences count')
-    parser.add_argument('--freq-input', '-fin', help='The .jl tables file used to compute co-occurrences')
-    parser.add_argument('--freq-pos', '-fpos', help='The references PoS file used to compute co-occurrences')
+    group.add_argument('--freq-input', '-fin', help='The .jl tables file used to compute co-occurrences')
+    group.add_argument('--freq-pos', '-fpos', help='The references PoS file used to compute co-occurrences')
 
-   # parser.add_argument('--input', '-i', required=True,
-    #                    help='The input tables file')
-    #parser.add_argument('--pos', '-p', required=True,
-     #                   help='PoS outputs file')
-    #parser.add_argument('--deprel', '-d', required=True,
-     #                   help='Dependency relations outputs file')
-    #parser.add_argument('--scores', '-s', required=True,
-     #                   help='Scores file to write')
+    
+    group = parser.add_argument_group('Arguments to parametrize the scoring')
+    group.add_argument('--input', '-i', required=True,
+                        help='The input tables file')
+    group.add_argument('--pos', '-p', required=True,
+                        help='PoS outputs file')
+    group.add_argument('--deprel', '-d', required=True,
+                        help='Dependency relations outputs file')
+    group.add_argument('--scores', '-s', required=True,
+                       help='Scores file to write')
+    group.add_argument('--expand', '-e', choices=['avg', 'max'], default='avg',
+                       help='Scores file to write')
+
+    group = parser.add_argument_group('Arguments regarding multiprocessing')
+    group.add_argument('--n_jobs', dest='n_jobs', type=int, default=-1,
+                        help='number of processes to use. <0 for cpu_count()')
+    group.add_argument('--chunksize', dest='chunksize', type=int, default=10,
+                        help='chunksize to use in mp.Pool().imap()' \
+                             'Change this if you know what you are doing.')
 
     args = parser.parse_args()
+    
+    if not args.chunksize > 0:
+        print('\nWARNING:',
+              'Expected chunksize to be a non-zero positive integer.',
+              f'Instead got {args.chunksize}.',
+              'Instead, chunksize=1 will be used')
+        args.chunksize = 1
+    
+    if os.path.exists(args.scores):
+        print('\nWARNING:',
+              f'{args.scores} already exists, it will be overwritten.',
+              'Stop the process ASAP to avoid this\n')
+    else:
+        # we use this touch to verify dest is a valid path
+        # so that the script does not run if it's not the case
+        with open(args.scores, mode="w", encoding='utf8') as f:
+            pass 
 
-    main()
+    # Count co-occurences in the training set
+    co_occur = count_co_occurrences(args.frequencies, args.freq_input, args.freq_pos)
+
+    print('loading source tables, PoS-tagging and DependencyRelations-tagging')
+    tables = FileIterable.from_filename(args.input, fmt='jl')
+    sentences_pos = TaggedFileIterable.from_filename(args.pos)
+    sentences_dep = TaggedFileIterable.from_filename(args.deprel)
+    
+    zipped_inputs = [
+        item for item in tqdm.tqdm(
+            zip(tables, sentences_pos, sentences_dep),
+            desc='Reading files',
+            total=len(tables)
+        )
+    ]
+    
+    def deal_with_one_instance(zipped_args):
+    
+        input_table, input_pos, input_deprel = zipped_args 
+
+        scores = build_scores(input_table, co_occur)
+        sentence = build_sentence_object(fuse_pos_and_deprel(input_pos, input_deprel))
+
+        h = [float(token.pos_ in interesting_tags) for token in sentence]
+
+        # Score interesting tokens
+        for token in sentence:
+            if token.pos_ in interesting_tags:
+                h[token.i] -= scores.get(token.text, 0)
+
+        # Expand the hallucination scores according to the chosen strategy
+        {'max': max_expand,
+         'avg': avg_expand}[args.expand](sentence, h)
+
+        # Some tricks to harmonize the scoring
+        handle_sentence_punctuation(sentence, h)
+
+        return sentence, h
+    
+    n_jobs = mp.cpu_count() if args.n_jobs < 0 else args.n_jobs
+    print(f'Using {n_jobs} processes, starting now')
+    with open(args.scores, mode="w", encoding='utf8') as f, mp.Pool(processes=n_jobs) as pool:
+        _iterable = pool.imap(
+            deal_with_one_instance, 
+            zipped_inputs,
+            chunksize=args.chunksize
+        )
+        
+        for sentence, scores in tqdm.tqdm(
+            _iterable, total=len(tables), desc='Scoring references'):
+            
+            for token in sentence:
+                f.write(f'{token.text}\t{scores[token.i]}\n')
+            f.write('\n')
