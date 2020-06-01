@@ -26,7 +26,7 @@ This file can be processed into onmt-readable file with:
 `python data/format_weights.py --orig download --dest train_weights.txt --strategy binary --normalize --weight_regularization 1`
 
 
-Note that for now, the `preprocess.cfg` is setup to find a small version of the dataset, which can be created with the following script:
+Note that you can train model on a small version of the dataset using, which can be created with the following script:
 
 `python data/truncate_wikibio.py --folder small --max_size 1e4 --setname train test`
 
@@ -36,17 +36,20 @@ Note that for now, the `preprocess.cfg` is setup to find a small version of the 
 
 First things first, we compartimentalize experiments.
 
-`python create-experiment.py --dataset wikibio --name small`
+`python create-experiment.py --dataset wikibio --name sn3`
 
 We use the OpenNMT-py framework for training, included in `onmt/`. Our model has been added to our version of the repo.
 Training needs a preprocessing step:
 
+`mkdir experiments/wikibio/folder_with_dataset`
 `python run_onmt.py --preprocess --config preprocess.cfg`
 
 
 Now that the preprocessing step is done, we can train a model using:
 
-`python run_onmt.py --train --config train.cfg`
+`python run_onmt.py --train --config train_sn3.cfg`
+
+Please note that the model reported in our paper can be trained using the following config files: `train_sn2.cfg` and `train_sn3.cfg`
 
 
 # Inference
