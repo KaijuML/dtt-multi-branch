@@ -23,7 +23,9 @@ mv download data/
 
 This file can be processed into onmt-readable file with:
 
-`python data/format_weights.py --orig download --dest train_weights.txt --strategy binary --normalize --weight_regularization 1`
+`python data/format_weights.py --orig download --dest train_weights.txt --strategy thresholds --thresholds 0.4 --normalize --weight_regularization 1`
+
+This will use a fixed weight for the fluency factor (called in the script regularization) and will give token to the content branch if they are scored below 0.4, else to the hallucination branch. --normalize means weights are normalized by their sum (so that they sum to 1)
 
 
 Note that you can train model on a small version of the dataset using, which can be created with the following script:
