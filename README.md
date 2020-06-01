@@ -49,6 +49,15 @@ Now that the preprocessing step is done, we can train a model using:
 `python run_onmt.py --train --config train.cfg`
 
 
+# Inference
+
+The previous training step has saved checkpoints accross time. In order to find the best check point, you can use the following command:
+
+`python batch_translate.py --dataset wikibio --setname valid --experiment small --bsz 64 --bms 10 --blk 0 --gpu 0 --weights 0.5 0.4 0.1`
+
+This will generate text for every saved checkpoints with a batch size 64 and a beam size 10.
+
+
 # Evaluation
 
 ### BLEU and  PARENT
@@ -68,7 +77,7 @@ python3 data/avg_hallucination_sum.py $OUTPUT_SCORES
 ```
 
 ### Readability tests
-We perform 7 classic readability tests:
+We report the Flesch readability test. However note, that several classic readbility tests can be performed :
  * [Kincaid](https://en.wikipedia.org/wiki/Flesch%E2%80%93Kincaid_readability_tests)
  * [ARI](https://en.wikipedia.org/wiki/Automated_readability_index)
  * [Coleman-Liau](https://en.wikipedia.org/wiki/Coleman%E2%80%93Liau_index)
