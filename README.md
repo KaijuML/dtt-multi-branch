@@ -73,16 +73,16 @@ Those n-gram based metrics can be computed as follows:
 python3 compute_ngram_metrics.py data/wikibio/test_tables.jl data/wikibio/test_output.txt $OUTPUT_FILE
 ```
 
-### Sum of hallucination scores
+### Hallucination rate
 We can easily generate token-level hallucination score file in the same way we did for the training data (see the
 `data/README.md` file for details). Once obtained the `$OUTPUT_SCORES` file, we compute the mean of the sentence-level
-sum of the hallucination scores:
+hallucination rates, considering as hallucinated all tokens that are above a given threshold:
 ```bash
-python3 data/avg_hallucination_sum.py $OUTPUT_SCORES
+python3 data/avg_hallucination_rate.py $OUTPUT_SCORES
 ```
 
 ### Readability tests
-We report the Flesch readability test. However note, that several classic readbility tests can be performed :
+We report the Flesch readability test. However note, that several classic readability tests can be performed :
  * [Kincaid](https://en.wikipedia.org/wiki/Flesch%E2%80%93Kincaid_readability_tests)
  * [ARI](https://en.wikipedia.org/wiki/Automated_readability_index)
  * [Coleman-Liau](https://en.wikipedia.org/wiki/Coleman%E2%80%93Liau_index)
