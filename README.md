@@ -1,14 +1,16 @@
 # dtt-hallucinations-disentanglement
 
-This repo is for training a data-to-text encoder-decoder, whose decodeur is multi-branch: during decoding, it weights several RNNs to compute probability of next token.
+This repo is for training a data-to-text encoder-decoder, whose decoder is multi-branch: during decoding, it weights several RNNs to compute probability of next token.
 
-During training, weights are conditionned based on the probability of the target token to be a divergence from the table.
+During training, weights are conditioned based on the probability of the target token to be a divergence from the table.
 
 During inference, weights are fixed to only use RNNs which where associated to non-diverging tokens during training.
 
 To work work with OpenNMT-py, you will need the following libraries:
 
-`pip install torch torchtext configargpase`
+```bash
+pip3 install torch torchtext configargpase
+```
 
 # Dataset: download & format
 
@@ -16,49 +18,61 @@ For all dataset related operations, please refer to `data/README.md`
 
 You can download a file where each token has been scored, and examples are separated by empty lines
 
-`
+```bash
 wget https://datacloud.di.unito.it/index.php/s/zWs2MTzB6Bxfksw/download
 mv download data/
-`
+```
 
-This file can be processed into onmt-readable file with:
+This file can be processed into OpenNMT-readable file with:
 
-`python data/format_weights.py --orig download --dest train_weights.txt --strategy thresholds --thresholds 0.4 --normalize --weight_regularization 1`
+```bash
+python3 data/format_weights.py --orig download --dest train_weights.txt --strategy thresholds --thresholds 0.4 --normalize --weight_regularization 1
+```
 
 This will use a fixed weight for the fluency factor (called in the script regularization) and will give token to the content branch if they are scored below 0.4, else to the hallucination branch. --normalize means weights are normalized by their sum (so that they sum to 1)
 
 
 Note that you can train model on a small version of the dataset using, which can be created with the following script:
 
-`python data/truncate_wikibio.py --folder small --max_size 1e4 --setname train test`
+```bash
+python3 data/truncate_wikibio.py --folder small --max_size 1e4 --setname train test
+```
 
 
 
 # Training
 
-First things first, we compartimentalize experiments.
+First things first, we compartmentalize experiments.
 
-`python create-experiment.py --dataset wikibio --name sn3`
+```bash
+python3 create-experiment.py --dataset wikibio --name sn3
+```
 
 We use the OpenNMT-py framework for training, included in `onmt/`. Our model has been added to our version of the repo.
 Training needs a preprocessing step:
 
-`mkdir experiments/wikibio/folder_with_dataset`
-`python run_onmt.py --preprocess --config preprocess.cfg`
+```bash
+mkdir experiments/wikibio/folder_with_dataset
+python3 run_onmt.py --preprocess --config preprocess.cfg
+```
 
 
 Now that the preprocessing step is done, we can train a model using:
 
-`python run_onmt.py --train --config train_sn3.cfg`
+```bash
+python3 run_onmt.py --train --config train_sn3.cfg
+```
 
 Please note that the model reported in our paper can be trained using the following config files: `train_sn2.cfg` and `train_sn3.cfg`
 
 
 # Inference
 
-The previous training step has saved checkpoints accross time. In order to find the best check point, you can use the following command:
+The previous training step has saved checkpoints across time. In order to find the best check point, you can use the following command:
 
-`python batch_translate.py --dataset wikibio --setname valid --experiment small --bsz 64 --bms 10 --blk 0 --gpu 0 --weights 0.5 0.4 0.1`
+```bash
+python3 batch_translate.py --dataset wikibio --setname valid --experiment small --bsz 64 --bms 10 --blk 0 --gpu 0 --weights 0.5 0.4 0.1
+```
 
 This will generate text for every saved checkpoints with a batch size 64 and a beam size 10.
 
