@@ -14,6 +14,7 @@ from torch.nn.utils.rnn import pad_sequence
 import torch
 import traceback
 
+from onmt.metrics import RLLossCompute
 from onmt.utils.misc import get_model_device
 from onmt.utils.logging import logger
 
@@ -63,22 +64,43 @@ def build_trainer(opt, device_id, model, fields, optim, model_saver=None):
     
     weights_file = opt.weights_file if opt.weights_file else None
 
-    report_manager = onmt.utils.build_report_manager(opt, gpu_rank)
-    trainer = onmt.Trainer(model, train_loss, valid_loss, optim, trunc_size,
-                           shard_size, norm_method,
-                           accum_count, accum_steps,
-                           n_gpu, gpu_rank,
-                           gpu_verbose_level, report_manager,
-                           with_align=True if opt.lambda_align > 0 else False,
-                           model_saver=model_saver if gpu_rank == 0 else None,
-                           average_decay=average_decay,
-                           average_every=average_every,
-                           model_dtype=opt.model_dtype,
-                           earlystopper=earlystopper,
-                           dropout=dropout,
-                           dropout_steps=dropout_steps,
-                           weights_file=weights_file)
-    return trainer
+    if opt.train_with_rl:
+        if shard_size != 0:
+            raise ValueError('No shard size for RL training!')
+        report_manager = onmt.rl_trainer.RLReportManager(opt.report_every, -1)
+        
+        # building loss compute here for now
+        rl_loss = RLLossCompute(opt.rl_metric, tgt_field, opt.ref_path)
+            
+        # For logging purposes
+        onmt.rl_trainer.RLStatistics.LOSS_NAME = opt.rl_metric
+        return onmt.RLTrainer(
+            model=model, fields=fields, ml_loss=train_loss, rl_loss=rl_loss,
+            optim=optim, trunc_size=trunc_size, gamma_loss=opt.rl_gamma_loss,
+            norm_method=norm_method, accum_count=accum_count, 
+            accum_steps=accum_steps, n_gpu=n_gpu, gpu_rank=gpu_rank,
+            gpu_verbose_level=gpu_verbose_level, report_manager=report_manager,
+            model_saver=model_saver if gpu_rank == 0 else None, 
+            average_decay=average_decay, average_every=average_every,
+            model_dtype=opt.model_dtype, earlystopper=earlystopper,
+            dropout=dropout, dropout_steps=dropout_steps)
+    
+    else:
+        report_manager = onmt.utils.build_report_manager(opt, gpu_rank)
+        return onmt.Trainer(model, train_loss, valid_loss, optim, trunc_size,
+                            shard_size, norm_method,
+                            accum_count, accum_steps,
+                            n_gpu, gpu_rank,
+                            gpu_verbose_level, report_manager,
+                            with_align=True if opt.lambda_align > 0 else False,
+                            model_saver=model_saver if gpu_rank == 0 else None,
+                            average_decay=average_decay,
+                            average_every=average_every,
+                            model_dtype=opt.model_dtype,
+                            earlystopper=earlystopper,
+                            dropout=dropout,
+                            dropout_steps=dropout_steps,
+                            weights_file=weights_file)
 
 
 class Trainer(object):
