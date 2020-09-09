@@ -2,7 +2,27 @@ import json
 
 from data.co_occurrence import build_scores, build_sentence_object, fuse_pos_and_deprel, interesting_tags, avg_expand, \
     handle_sentence_punctuation
-from data.dep_parsing_all import _load_stanza
+
+
+def _load_stanza(_args):
+    """
+    Bi-LSTM-based deep biaffine neural dependency parser (Dozat and Manning, 2017), augmented with two linguistically
+    motivated features: one that predicts the linearization order of two words in a given language, and the other that
+    predicts the typical distance in linear order between them.
+    UD English EWT
+    UAS 86.22%
+    LAS 83.59%
+    """
+    import stanza
+    try:
+        model = stanza.Pipeline(
+            lang="en", processors='tokenize,pos,lemma,depparse')
+    except FileNotFoundError:
+        stanza.download('en')
+        model = stanza.Pipeline(
+            lang="en", processors='tokenize,pos,lemma,depparse')
+    model.processors['tokenize'].config['pretokenized'] = True
+    return model
 
 
 class HSS:
