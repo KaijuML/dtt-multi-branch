@@ -28,18 +28,20 @@ from onmt.metrics.hss import HSS
 
 
 class RLLossCompute:
-    def __init__(self, metric, tgt_field, ref_path):
+    def __init__(self, opt, tgt_field):
         self.cleaner = WikiBIOCleaner(tgt_field)
         
         #self.log("Initializing RL metric. Loading computed stats.")
         
-        if metric == "hss":
-            self.metric = HSS()
+        if opt.rl_metric == "hss":
+            assert all(f is not None for f in [opt.co_occur_file, opt.tables_file]),\
+                'HSS RL metric requires to set co_occur_file and jsonl_file options!'
+            self.metric = HSS(opt.co_occur_file, opt.tables_file)
         else:
             # raise error
             raise ValueError('No other metric than HSS are supported')
         
-        with open(ref_path, encoding="utf8", mode="r") as f:
+        with open(opt.ref_path, encoding="utf8", mode="r") as f:
             self.references = [ref.strip() for ref in f if ref.strip()]
                 
         #self.log("PARENT metric Initialized.")

@@ -70,7 +70,7 @@ def build_trainer(opt, device_id, model, fields, optim, model_saver=None):
         report_manager = onmt.rl_trainer.RLReportManager(opt.report_every, -1)
         
         # building loss compute here for now
-        rl_loss = RLLossCompute(opt.rl_metric, tgt_field, opt.ref_path)
+        rl_loss = RLLossCompute(opt, tgt_field)
             
         # For logging purposes
         onmt.rl_trainer.RLStatistics.LOSS_NAME = opt.rl_metric

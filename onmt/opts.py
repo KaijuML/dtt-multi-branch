@@ -563,7 +563,11 @@ def train_opts(parser):
     group.add('--rl_metric', '-rl_metric',
               default="hss", choices=['hss'],
               help="The metric to use for RL")
-    group.add('--ref_path', '-ref_path', 
+    group.add('--co_occur_file', '-co_occur_file',
+              help='JSON co-occurrences file created by the scoring script. Required for HSS RL metric')
+    group.add('--tables_file', '-tables_file',
+              help='Dataset JSONL input file, used to retrieve original inputs. Required for HSS RL metric')
+    group.add('--ref_path', '-ref_path',
               help="path to references")
 
     group = parser.add_argument_group('Logging')
