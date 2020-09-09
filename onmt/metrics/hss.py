@@ -4,7 +4,7 @@ from data.co_occurrence import build_scores, build_sentence_object, fuse_pos_and
     handle_sentence_punctuation
 
 
-def _load_stanza(_args):
+def _load_stanza():
     """
     Bi-LSTM-based deep biaffine neural dependency parser (Dozat and Manning, 2017), augmented with two linguistically
     motivated features: one that predicts the linearization order of two words in a given language, and the other that
