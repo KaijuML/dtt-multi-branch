@@ -1,5 +1,7 @@
 import json
 
+import numpy as np
+
 from data.co_occurrence import build_scores, build_sentence_object, fuse_pos_and_deprel, interesting_tags, avg_expand, \
     handle_sentence_punctuation
 
@@ -25,7 +27,7 @@ def _load_stanza():
     return model
 
 
-class HSS:
+class _HallucinationScore:
     def __init__(self, co_occur_file, tables_file):
         with open(co_occur_file) as f:
             self.co_occur = json.load(f)
@@ -54,4 +56,14 @@ class HSS:
 
         # Some tricks to harmonize the scoring
         handle_sentence_punctuation(sentence, h)
-        return sum(h)
+        return h
+
+
+class HSS(_HallucinationScore):
+    def __call__(self, sentence, i):
+        return sum(super().__call__(sentence, i))
+
+
+class HSA(_HallucinationScore):
+    def __call__(self, sentence, i):
+        return np.mean(super().__call__(sentence, i))

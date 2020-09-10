@@ -12,35 +12,31 @@ everything works correctly.
 HSS == Halucination Scores Sum
 """
 
-import collections
-import itertools
-import torch
-import json
-import onmt
 import sys
 
-import numpy as np
+import torch
 
-from onmt.utils.misc import sequence_mask
-from onmt.utils.logging import logger
+import onmt
+from onmt.metrics.hss import HSS, HSA
 from onmt.metrics.utils import WikiBIOCleaner
-from onmt.metrics.hss import HSS
+from onmt.utils.logging import logger
+from onmt.utils.misc import sequence_mask
 
 
 class RLLossCompute:
     def __init__(self, opt, tgt_field):
         self.cleaner = WikiBIOCleaner(tgt_field)
-        
-        #self.log("Initializing RL metric. Loading computed stats.")
-        
-        if opt.rl_metric == "hss":
-            assert all(f is not None for f in [opt.co_occur_file, opt.tables_file]),\
-                'HSS RL metric requires to set co_occur_file and jsonl_file options!'
-            self.metric = HSS(opt.co_occur_file, opt.tables_file)
+
+        # self.log("Initializing RL metric. Loading computed stats.")
+
+        if opt.rl_metric in ["hss", "hsa"]:
+            assert all(f is not None for f in [opt.co_occur_file, opt.tables_file]), \
+                'Hallucination Score based RL metrics require to set co_occur_file and jsonl_file options!'
+            self.metric = {"hss": HSS, "hsa": HSA}[opt.rl_metric](opt.co_occur_file, opt.tables_file)
         else:
             # raise error
-            raise ValueError('No other metric than HSS are supported')
-        
+            raise ValueError('No other metric than HSS and HSA are supported')
+
         with open(opt.ref_path, encoding="utf8", mode="r") as f:
             self.references = [ref.strip() for ref in f if ref.strip()]
                 

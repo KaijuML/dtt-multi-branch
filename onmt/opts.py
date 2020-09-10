@@ -561,12 +561,14 @@ def train_opts(parser):
               help="proportion of RL to use. ' \
               'Will use 1 - rl_gamma_loss of teacher forcing")
     group.add('--rl_metric', '-rl_metric',
-              default="hss", choices=['hss'],
+              default="hss", choices=['hss', 'hsa'],
               help="The metric to use for RL")
     group.add('--co_occur_file', '-co_occur_file',
-              help='JSON co-occurrences file created by the scoring script. Required for HSS RL metric')
+              help='JSON co-occurrences file created by the scoring script. Required for Hallucination Score based RL '
+                   'metrics')
     group.add('--tables_file', '-tables_file',
-              help='Dataset JSONL input file, used to retrieve original inputs. Required for HSS RL metric')
+              help='Dataset JSONL input file, used to retrieve original inputs. Required for Hallucination Score based '
+                   'RL metrics')
     group.add('--ref_path', '-ref_path',
               help="path to references")
 
