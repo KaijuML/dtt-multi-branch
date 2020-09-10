@@ -35,7 +35,7 @@ class HSS:
 
     def __call__(self, sentence, i):
         input_table = self.inputs[i]
-        sentence = self.nlp(sentence).sentences[0]
+        sentence = self.nlp([sentence]).sentences[0]
         pos = [(token.text, token.upos) for token in sentence.words]
         deprel = [(token.text, token.deprel, token.head) for token in sentence.words]
 
