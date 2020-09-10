@@ -40,7 +40,7 @@ class Token:
         if name == 'head' and value:
             value.children.add(self)
 
-    def subtree(self, condition=lambda _: True, preserve_children=False):
+    def subtree(self, condition=lambda _: True, preserve_children=False, tabu=set()):
         """
 
         Args:
@@ -51,9 +51,10 @@ class Token:
 
         """
         s = {self}
-        for c in self.children:
+        for c in filter(lambda c: c not in tabu, self.children):
+            tabu.add(c)
             if condition(c):
-                s.update(c.subtree(condition=condition, preserve_children=preserve_children))
+                s.update(c.subtree(condition=condition, preserve_children=preserve_children, tabu=tabu))
             elif preserve_children:
                 s.add(c)
         return s

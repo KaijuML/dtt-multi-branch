@@ -35,12 +35,12 @@ class HSS:
 
     def __call__(self, sentence, i):
         input_table = self.inputs[i]
-        parsed = self.nlp(sentence)
-        input_pos, input_deprel = None, None  # TODO from 'parsed' object
-        breakpoint()
+        sentence = self.nlp(sentence).sentences[0]
+        pos = [(token.text, token.upos) for token in sentence.words]
+        deprel = [(token.text, token.deprel, token.head) for token in sentence.words]
 
         scores = build_scores(input_table, self.co_occur)
-        sentence = build_sentence_object(fuse_pos_and_deprel(input_pos, input_deprel))
+        sentence = build_sentence_object(fuse_pos_and_deprel(pos, deprel))
 
         h = [float(token.pos_ in interesting_tags) for token in sentence]
 
