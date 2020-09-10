@@ -36,7 +36,7 @@ class _HallucinationScore:
         self.nlp = _load_stanza()
 
     def __call__(self, sentence, i):
-        if len(sentence.sentences) == 0:
+        if len(sentence) == 0:
             return [0]
         input_table = self.inputs[i]
         sentence = self.nlp([sentence]).sentences[0]
