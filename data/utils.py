@@ -21,6 +21,27 @@ def nwise(iterable, n=2):
     return zip(*iterables)
 
 
+def request_permission(msg, yes_by_default=True):
+    """
+    In many script, we want to ask a user for permission before doing stuff.
+    This little function asks for a Yes-No answer, and repeats until it gets one.
+    
+    Return True when permission is granted, False otherwise.
+    """
+    msg, ok = f'{msg} [{"Y|n" if yes_by_default else "y|N"}] ', None
+    while ok is None:
+        ok = input(msg).lower()
+        if ok == '':
+            return yes_by_default
+        elif ok[0] == 'y':
+            return True
+        elif ok[0] == 'n':
+            return False
+        else:
+            print(f'This answer ({ok}) is not valid.')
+            ok = None
+
+
 class FileIterable:
     def __init__(self, iterable, filename=None):
         self._iterable = more_itertools.seekable(iterable)

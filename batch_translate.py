@@ -54,8 +54,13 @@ if __name__ == "__main__":
     models = [fname for fname in os.listdir(mdl_dir) if fname.endswith('.pt')]
     models = sorted(models, key=get_step, reverse=False)
 
-    src = pkg_resources.resource_filename(__name__, 'data')
-    src = os.path.join(src, args.dataset, 'small' if args.small else '',  f'{args.setname}_input.txt')
+    datadir = pkg_resources.resource_filename(__name__, 'data')
+    src = os.path.join(datadir, args.dataset, 
+                       'small' if args.small else '', 
+                       f'{args.setname}_input.txt')
+    tgt = os.path.join(datadir, args.dataset,
+                       'small' if args.small else '',  
+                       f'{args.setname}_output.txt')
     
     n_processed = -1
     for idx, fname in enumerate(models):
@@ -79,6 +84,7 @@ if __name__ == "__main__":
         cmd_args = [
             f'-model {model}',
             f'-src {src}',
+            f'-tgt {tgt}',
             f'-output {output}',
             f'-beam_size {args.bms}',
             f'-block_ngram_repeat {args.blk}',
