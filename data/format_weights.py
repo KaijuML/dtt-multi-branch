@@ -75,7 +75,7 @@ class Strategy:
     def score_weight(self, w):
         s = self._score_weight(w)
         if self.reverse:
-            s.reverse()
+            s = s.reverse()
         if self.weight_regularization > 0:
             s.insert(0, self.weight_regularization)
         if self.normalize:
