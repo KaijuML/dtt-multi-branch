@@ -1,11 +1,14 @@
+from utils import nwise
+
 import pkg_resources
 import re, time, os
 import itertools
-import json
+import argparse
 import numpy
+import json
 
 
-def split_infobox(folder):
+def split_infobox(dataset_folder, destination_folder):
     """
     extract box content, field type and position information from infoboxes from original_data
     *.box.val is the box content (token)
@@ -13,18 +16,18 @@ def split_infobox(folder):
     *.box.pos is the position counted from the begining of a field
     """
     
-    bwfile = [os.path.join(folder, 'processed_data', setname, f"{setname}.box.val")
+    bwfile = [os.path.join(destination_folder, 'processed_data', setname, f"{setname}.box.val")
               for setname in ['train', 'valid', 'test']]
     
-    bffile = [os.path.join(folder, 'processed_data', setname, f"{setname}.box.lab")
+    bffile = [os.path.join(destination_folder, 'processed_data', setname, f"{setname}.box.lab")
               for setname in ['train', 'valid', 'test']]
     
-    bpfile = [os.path.join(folder, 'processed_data', setname, f"{setname}.box.pos")
+    bpfile = [os.path.join(destination_folder, 'processed_data', setname, f"{setname}.box.pos")
               for setname in ['train', 'valid', 'test']]
     
     mixb_word, mixb_label, mixb_pos = [], [], []
     for setname in ['train', 'valid', 'test']:
-        fboxes = os.path.join(folder, 'raw', setname, f"{setname}.box")
+        fboxes = os.path.join(dataset_folder, 'raw', setname, f"{setname}.box")
         with open(fboxes, mode="r", encoding="utf8") as f:
             box = [line.strip() for line in f if line.strip()]
         box_word, box_label, box_pos = [], [], []
@@ -149,12 +152,12 @@ def create_input(folder):
             
             
             
-def extract_first_sentence(folder):
+def extract_sentences(dataset_folder, destination_folder, only_first=True):
     
     for setname in ['train', 'valid', 'test']:
-        inputnb_filename = os.path.join(folder, 'raw', setname, f"{setname}.nb")
-        inputsent_filename = os.path.join(folder, 'raw', setname, f"{setname}.sent")
-        output_filename = os.path.join(folder, 'full', f"{setname}_output.txt")
+        inputnb_filename = os.path.join(dataset_folder, 'raw', setname, f"{setname}.nb")
+        inputsent_filename = os.path.join(dataset_folder, 'raw', setname, f"{setname}.sent")
+        output_filename = os.path.join(destination_folder, 'full', f"{setname}_output.txt")
         
         nb = [0]
         with open(inputnb_filename, encoding='utf8', mode='r') as f:
@@ -163,16 +166,21 @@ def extract_first_sentence(folder):
             # more than one sentence each. (number is variable)
             for idx, line in enumerate(f):
                 nb += [int(line.strip())]
-            indices = numpy.cumsum(nb[:-1])
+        indices = numpy.cumsum(nb[:-1])
 
-        sent = list()
+        sentences = list()
         with open(inputsent_filename, encoding='utf8', mode='r') as f:
             for idx, line in enumerate(f):
-                sent += [line.strip()]
+                sentences += [line.strip()]
                 
-        with open(output_filename, mode='w', encoding='utf8') as f:
-            for idx in indices:
-                f.write(sent[idx] + '\n')
+        if only_first:
+            with open(output_filename, mode='w', encoding='utf8') as f:
+                for idx in indices:
+                    f.write(sentences[idx] + '\n')
+        else:
+            with open(output_filename, mode='w', encoding='utf8') as f:
+                for start, end in nwise(indices, n=2):
+                    f.write(' '.join(sentences[start:end]) + '\n')
                 
                 
 def create_tables(folder):
@@ -218,7 +226,7 @@ def create_tables(folder):
         with open(output_filename, mode="w", encoding="utf8") as f:
             for table in tables: f.write(json.dumps(table) + '\n')
 
-def preprocess(folder):
+def preprocess(dataset_folder, destination_folder, args):
     """
     We use a triple <f, p+, p-> to represent the field information of a token in the specific field. 
     p+&p- are the position of the token in that field counted from the begining and the end of the field.
@@ -227,31 +235,34 @@ def preprocess(folder):
     """
     print("extracting token, field type and position info from original data ...")
     time_start = time.time()
-    split_infobox(folder)
-    reverse_pos(folder)
+    split_infobox(dataset_folder, destination_folder)
+    reverse_pos(destination_folder)
     duration = time.time() - time_start
     print(f"extract finished in {duration:.3f} seconds")
     
     print("merging everything into single input file ...")
     time_start = time.time()
-    create_input(folder)
+    create_input(destination_folder)
     duration = time.time() - time_start
     print(f"merge finished in {duration:.3f} seconds")   
     
     print("extracting first sentences from original data ...")
     time_start = time.time()
-    extract_first_sentence(folder)
+    extract_sentences(dataset_folder, destination_folder, args.first_sentence)
     duration = time.time() - time_start
     print(f"extract finished in {duration:.3f} seconds")
     
     print("formatting input in human readable format ...")
     time_start = time.time()
-    create_tables(folder)
+    create_tables(destination_folder)
     duration = time.time() - time_start
     print(f"formatting finished in {duration:.3f} seconds")
 
 
 def make_dirs(folder):
+    if not os.path.exists(folder):
+        os.mkdir(folder)
+    
     os.mkdir(os.path.join(folder, 'full'))
     os.mkdir(os.path.join(folder, "processed_data/"))
     os.mkdir(os.path.join(folder, "processed_data/train/"))
@@ -259,12 +270,24 @@ def make_dirs(folder):
     os.mkdir(os.path.join(folder, "processed_data/valid/"))
     
     
-def main():
-    folder = pkg_resources.resource_filename(__name__, 'wikibio')
-    
-    make_dirs(folder)
-    preprocess(folder)
+def main(args):
 
     
 if __name__ == '__main__':
-    main()
+
+    dataset_folder = pkg_resources.resource_filename(__name__, 'wikibio')
+    
+    parser = argparse.ArgumentParser()
+    
+    group = parser.add_argument_group('Destination path')
+    group.add_argument('--dest', '-d', dest='dest',
+                        default=dataset_folder,
+                        help='Folder where to store the resulting files')
+    
+    parser.add_argument('--first_sentence', action='store_true',
+                        help="Activate to keep only the first sentence")
+
+    args = parser.parse_args()
+    
+    make_dirs(args.dest)
+    preprocess(dataset_folder, args.dest, args)
