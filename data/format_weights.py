@@ -226,8 +226,8 @@ if __name__ == '__main__':
         eos_weights=args.eos_weights, 
         normalize=args.normalize, 
         weight_regularization=args.weight_regularization,
-        thresholds=args.thresholds,
-        reverse=args.reverse
+        reverse=args.reverse,
+        thresholds=args.thresholds
     )
     
     n_jobs = mp.cpu_count() if args.n_jobs < 0 else args.n_jobs
