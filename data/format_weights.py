@@ -116,8 +116,8 @@ class ThresholdsStrategy(Strategy):
     """
     
     @overrides
-    def __init__(self, eos_weights, normalize, weight_regularization, thresholds, **kwargs):
-        super().__init__(eos_weights, normalize, weight_regularization)
+    def __init__(self, eos_weights, normalize, weight_regularization, thresholds, reverse, **kwargs):
+        super().__init__(eos_weights, normalize, weight_regularization, reverse)
         self.thresholds = thresholds
         
     @overrides
@@ -140,8 +140,8 @@ class ContinousThresholdStrategy(ThresholdsStrategy):
 
 class OneBranchStrategy(Strategy):
     @overrides
-    def __init__(self, eos_weights, normalize, weight_regularization, **kwargs):
-        super().__init__(eos_weights, normalize, weight_regularization)
+    def __init__(self, eos_weights, normalize, weight_regularization, reverse, **kwargs):
+        super().__init__(eos_weights, normalize, weight_regularization, reverse)
         if not self.eos_weights == [1]:
             raise ValueError('OneBranch strategy should have only one branch, '
                              'and predict </s> with weight 1. '
