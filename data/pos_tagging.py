@@ -184,7 +184,9 @@ def do_file(pos_folder, orig, dest, gpus, split_size=int(5e4)):
     print('Done.')
 
 if __name__ == '__main__':
-    
+    pos_folder = pkg_resources.resource_filename(__name__, 'pos')
+    wiki_folder = pkg_resources.resource_filename(__name__, 'wikibio')
+
     parser = argparse.ArgumentParser()
     parser.add_argument('--do_train', dest='do_train', action='store_true',
                         help='fine-tune BERT with a PoS-tagging task')
@@ -195,7 +197,9 @@ if __name__ == '__main__':
                         help='list of devices to train/predict on.')
     parser.add_argument('--split_size', dest='split_size', type=int, default=5e4,
                         help='To be memory efficient, process this much line at once only.')
-    
+    parser.add_argument('--pos_folder', dest='pos_folder', default=pos_folder)
+    parser.add_argument('--wiki_folder', dest='wiki_folder', default=wiki_folder)
+
     # These arguments are for stand-alone file
     parser.add_argument('--orig', '-o', dest='orig',
                         help='Name of the stand alone file')
@@ -203,10 +207,7 @@ if __name__ == '__main__':
                         help='Name of the resulting file')
     
     args = parser.parse_args()
-    
-    pos_folder = pkg_resources.resource_filename(__name__, 'pos')
-    wiki_folder = pkg_resources.resource_filename(__name__, 'wikibio')
-    
+
     gpus = ','.join(map(str, args.gpus))
     if not gpus:
         print('Not using gpu can be significantly slower.')
@@ -215,11 +216,11 @@ if __name__ == '__main__':
         print(f'Using the following device{"s" if len(args.gpus)>1 else ""}: [{gpus}]' )
     
     if args.do_train:
-        do_train(pos_folder, gpus)
+        do_train(args.pos_folder, gpus)
         
     if args.do_tagging:
-        do_tagging(pos_folder, wiki_folder, args.do_tagging, gpus, args.split_size)
+        do_tagging(args.pos_folder, args.wiki_folder, args.do_tagging, gpus, args.split_size)
         
     if args.orig:
         assert os.path.exists(args.orig)
-        do_file(pos_folder, args.orig, args.dest, gpus, args.split_size)
+        do_file(args.pos_folder, args.orig, args.dest, gpus, args.split_size)
