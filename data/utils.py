@@ -51,9 +51,12 @@ class FileIterable:
         self._len = None
         
     @classmethod
-    def from_filename(cls, path, func=None, fmt='txt'):
+    def from_filename(cls, path, func=None, fmt=None):
+        no_fmt_given = fmt is None
+        fmt = fmt if fmt is not None else 'txt'
         if not path.endswith(fmt):
-            print(f'\nWARNING: path is {path} but format is {fmt}')
+            print(f'WARNING: path is {path} but format is {fmt}' \
+                  f'{" (by default)" if no_fmt_given else ""}.')
         
         return cls(cls.read_file(path, func, fmt), path)
     
