@@ -35,7 +35,7 @@ def read_conllu(path):
     return tagged_sentences
 
 
-def do_train(folder, gpus):
+def do_train(folder, gpus, max_seq_length):
     """
     Fine-tune BERT on UniversalDependencies. If needed, download and format the training set.
     """
@@ -83,7 +83,7 @@ def do_train(folder, gpus):
         'labels': f'{folder}/labels.txt',
         'model_name_or_path': 'bert-base-uncased',
         'output_dir': f'{folder}/trained',
-        'max_seq_length': '256',
+        'max_seq_length': str(max_seq_length),
         'num_train_epochs': '3',
         'per_gpu_train_batch_size': '32',
         'save_steps': '750',
@@ -96,7 +96,7 @@ def do_train(folder, gpus):
     shell(f'{env_variables} python run_ner.py {training_args} --do_train')
     
     
-def run_script(examples, pos_folder, dest, gpus):
+def run_script(examples, pos_folder, dest, gpus, max_seq_length):
     
     # This dict is used to map the weirdly formatted tokens of wikibio 
     # to tokens known to BERT
@@ -124,7 +124,7 @@ def run_script(examples, pos_folder, dest, gpus):
         f'--labels {os.path.join(pos_folder, "labels.txt")}',
         '--model_name_or_path bert-base-uncased',
         f'--output_dir {os.path.join(pos_folder, "trained")}',
-        '--max_seq_length 256',
+        f'--max_seq_length {max_seq_length}',
         '--do_predict',
         '--per_gpu_eval_batch_size 64'
     ])
@@ -143,7 +143,7 @@ def run_script(examples, pos_folder, dest, gpus):
     # removing cached data so that we can continue training on different examples
     shell(f'rm {os.path.join(pos_folder, "cached_test_bert-base-uncased_256")}')
 
-def do_tagging(pos_folder, wiki_folder, setnames, gpus, split_size=int(5e4)):
+def do_tagging(pos_folder, wiki_folder, setnames, gpus, max_seq_length, split_size=int(5e4)):
     """This will format the train/dev/test sets of wikibio 
     so that we can run the PoS tagging network we have trained"""
     
@@ -159,15 +159,15 @@ def do_tagging(pos_folder, wiki_folder, setnames, gpus, split_size=int(5e4)):
                 if not line.strip(): continue
                 examples.append(line.strip())
                 
-                if split_size>0 and len(examples) >= split_size:
-                    run_script(examples, pos_folder, dest, gpus)
+                if 0 < split_size <= len(examples):
+                    run_script(examples, pos_folder, dest, gpus, max_seq_length)
                     examples = list()
                     
         if examples:
-            run_script(examples, pos_folder, dest, gpus)
+            run_script(examples, pos_folder, dest, gpus, max_seq_length)
         print('Done.')
             
-def do_file(pos_folder, orig, dest, gpus, split_size=int(5e4)):
+def do_file(pos_folder, orig, dest, gpus, max_seq_length, split_size=int(5e4)):
     """This will tag an individual file 'orig' into 'dest'"""
     examples = list()
     with open(orig, mode='r', encoding='utf8') as f:
@@ -175,16 +175,18 @@ def do_file(pos_folder, orig, dest, gpus, split_size=int(5e4)):
             if not line.strip(): continue
             examples.append(line.strip())
 
-            if split_size>0 and len(examples) >= split_size:
-                run_script(examples, pos_folder, dest, gpus)
+            if 0 < split_size <= len(examples):
+                run_script(examples, pos_folder, dest, gpus, max_seq_length)
                 examples = list()
 
     if examples:
-        run_script(examples, pos_folder, dest, gpus)
+        run_script(examples, pos_folder, dest, gpus, max_seq_length)
     print('Done.')
 
 if __name__ == '__main__':
-    
+    pos_folder = pkg_resources.resource_filename(__name__, 'pos')
+    wiki_folder = pkg_resources.resource_filename(__name__, 'wikibio')
+
     parser = argparse.ArgumentParser()
     parser.add_argument('--do_train', dest='do_train', action='store_true',
                         help='fine-tune BERT with a PoS-tagging task')
@@ -193,9 +195,12 @@ if __name__ == '__main__':
                              'Specify any combinason of [train, valid, test]')
     parser.add_argument('--gpus', dest='gpus', nargs="+", type=int, 
                         help='list of devices to train/predict on.')
+    parser.add_argument('--max_seq_length', dest='max_seq_length', default=256)
     parser.add_argument('--split_size', dest='split_size', type=int, default=5e4,
                         help='To be memory efficient, process this much line at once only.')
-    
+    parser.add_argument('--pos_folder', dest='pos_folder', default=pos_folder)
+    parser.add_argument('--wiki_folder', dest='wiki_folder', default=wiki_folder)
+
     # These arguments are for stand-alone file
     parser.add_argument('--orig', '-o', dest='orig',
                         help='Name of the stand alone file')
@@ -203,10 +208,7 @@ if __name__ == '__main__':
                         help='Name of the resulting file')
     
     args = parser.parse_args()
-    
-    pos_folder = pkg_resources.resource_filename(__name__, 'pos')
-    wiki_folder = pkg_resources.resource_filename(__name__, 'wikibio')
-    
+
     gpus = ','.join(map(str, args.gpus))
     if not gpus:
         print('Not using gpu can be significantly slower.')
@@ -215,11 +217,11 @@ if __name__ == '__main__':
         print(f'Using the following device{"s" if len(args.gpus)>1 else ""}: [{gpus}]' )
     
     if args.do_train:
-        do_train(pos_folder, gpus)
+        do_train(args.pos_folder, gpus, args.max_seq_length)
         
     if args.do_tagging:
-        do_tagging(pos_folder, wiki_folder, args.do_tagging, gpus, args.split_size)
+        do_tagging(args.pos_folder, args.wiki_folder, args.do_tagging, gpus, args.max_seq_length, args.split_size)
         
     if args.orig:
         assert os.path.exists(args.orig)
-        do_file(pos_folder, args.orig, args.dest, gpus, args.split_size)
+        do_file(args.pos_folder, args.orig, args.dest, gpus, args.max_seq_length, args.split_size)

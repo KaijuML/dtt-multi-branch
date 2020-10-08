@@ -53,7 +53,7 @@ class Strategy:
     In order to implement a new strategy, only the method `_score_weight` should be
     implemented. It should be a function (float --> List[float OR int])    
     """
-    def __init__(self, eos_weights, normalize=False, weight_regularization=0, **kwargs):
+    def __init__(self, eos_weights, normalize=False, weight_regularization=0, reverse=False, **kwargs):
         self.normalize = normalize
         self.weight_regularization = weight_regularization
 
@@ -63,6 +63,7 @@ class Strategy:
         if normalize:
             eos_weights = [w / sum(eos_weights) for w in eos_weights]
         self.eos_weights = eos_weights
+        self.reverse = reverse
 
     @staticmethod
     def chain_scores(scores):
@@ -73,6 +74,8 @@ class Strategy:
 
     def score_weight(self, w):
         s = self._score_weight(w)
+        if self.reverse:
+            s.reverse()
         if self.weight_regularization > 0:
             s.insert(0, self.weight_regularization)
         if self.normalize:
@@ -113,8 +116,8 @@ class ThresholdsStrategy(Strategy):
     """
     
     @overrides
-    def __init__(self, eos_weights, normalize, weight_regularization, thresholds, **kwargs):
-        super().__init__(eos_weights, normalize, weight_regularization)
+    def __init__(self, eos_weights, normalize, weight_regularization, thresholds, reverse, **kwargs):
+        super().__init__(eos_weights, normalize, weight_regularization, reverse)
         self.thresholds = thresholds
         
     @overrides
@@ -137,8 +140,8 @@ class ContinousThresholdStrategy(ThresholdsStrategy):
 
 class OneBranchStrategy(Strategy):
     @overrides
-    def __init__(self, eos_weights, normalize, weight_regularization, **kwargs):
-        super().__init__(eos_weights, normalize, weight_regularization)
+    def __init__(self, eos_weights, normalize, weight_regularization, reverse, **kwargs):
+        super().__init__(eos_weights, normalize, weight_regularization, reverse)
         if not self.eos_weights == [1]:
             raise ValueError('OneBranch strategy should have only one branch, '
                              'and predict </s> with weight 1. '
@@ -184,6 +187,8 @@ if __name__ == '__main__':
                         type=float, help='Weights to predict </s> token.')
     group.add_argument('--thresholds', dest='thresholds', nargs='+',
                         type=float, help='thresholds for ThresholdsStrategy.')
+    group.add_argument('--reverse', dest='reverse', action='store_true',
+                       help='reverse weights\' order')
     
     group = parser.add_argument_group('Arguments regarding multiprocessing')
     group.add_argument('--n_jobs', dest='n_jobs', type=int, default=-1,
@@ -221,6 +226,7 @@ if __name__ == '__main__':
         eos_weights=args.eos_weights, 
         normalize=args.normalize, 
         weight_regularization=args.weight_regularization,
+        reverse=args.reverse,
         thresholds=args.thresholds
     )
     
