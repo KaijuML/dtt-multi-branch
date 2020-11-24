@@ -45,7 +45,7 @@ python3 data/truncate_wikibio.py --folder small --max_size 1e4 --setname train t
 First things first, we compartmentalize experiments.
 
 ```bash
-python3 create-experiment.py --dataset wikibio --name sn3
+python3 create-experiment.py --dataset wikibio --name mbd
 ```
 
 We use the OpenNMT-py framework for training, included in `onmt/`. Our model has been added to our version of the repo.
@@ -60,10 +60,10 @@ python3 run_onmt.py --preprocess --config preprocess.cfg
 Now that the preprocessing step is done, we can train a model using:
 
 ```bash
-python3 run_onmt.py --train --config train_sn3.cfg
+python3 run_onmt.py --train --config train_mbd.cfg
 ```
 
-Please note that the model reported in our paper can be trained using the following config files: `train_sn2.cfg` and `train_sn3.cfg`
+Please note that the model reported in our paper can be trained using the `train_mbd.cfg` config file.
 
 
 # Inference
