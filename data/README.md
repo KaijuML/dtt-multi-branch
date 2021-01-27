@@ -18,9 +18,9 @@ Scripts assume you are in the `data/` repository, with the following file:
 ├── utils_ner.py        
 ```
 
-## WikiBIO download and basic formatting
+## WikiBIO and ToTTo download and basic formatting
 
-Download and unpack the dataset:
+Download and unpack the WikiBIO dataset:
 
 ```bash
 git clone https://github.com/DavidGrangier/wikipedia-biography-dataset.git
@@ -38,6 +38,17 @@ create the dataset:
 
 ```bash
 python3 format_wikibio.py
+```
+
+Download and upack the ToTTo dataset:
+```bash
+wget https://storage.googleapis.com/totto/totto_data.zip
+unzip totto_data.zip
+```
+
+create the dataset:
+```bash
+python3 format_totto.py --orig totto_data --dest totto
 ```
 
 The whole OpenNMT-ready dataset can now be found in `wikibio/full`:

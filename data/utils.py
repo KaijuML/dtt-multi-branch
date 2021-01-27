@@ -43,6 +43,13 @@ def request_permission(msg, yes_by_default=True):
 
 
 class FileIterable:
+    
+    _ext_mapping = {
+        'txt': ['txt'],
+        'jl': ['jsonl', 'jl'],
+        'jsonl': ['jsonl', 'jl']
+    }
+    
     def __init__(self, iterable, filename=None):
         self._iterable = more_itertools.seekable(iterable)
         self._filename = filename
@@ -54,7 +61,7 @@ class FileIterable:
     def from_filename(cls, path, func=None, fmt=None):
         no_fmt_given = fmt is None
         fmt = fmt if fmt is not None else 'txt'
-        if not path.endswith(fmt):
+        if not any(path.endswith(ext) for ext in self._ext_mapping[fmt]):
             print(f'WARNING: path is {path} but format is {fmt}' \
                   f'{" (by default)" if no_fmt_given else ""}.')
         
@@ -72,7 +79,7 @@ class FileIterable:
         """
         if fmt == 'txt':
             def _read_line(line): return line.strip().split()
-        elif fmt == 'jl':
+        elif fmt in ['jl', 'jsonl']:
             def _read_line(line): return json.loads(line)
         else:
             raise ValueError(f'Unkown file format {fmt}')
