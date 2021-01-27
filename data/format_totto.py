@@ -1,4 +1,4 @@
-"""Most of this code has been adapted from 
+"""the method `create_table` is adapted from 
 https://github.com/google-research/language/tree/master/language/totto"""
 
 from nltk.tokenize import word_tokenize
