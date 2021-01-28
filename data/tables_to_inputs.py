@@ -19,6 +19,10 @@ if __name__ == '__main__':
     group.add_argument('--dest', '-d', dest='dest',
                         help='Name of the inputs file.')
     
+    group = parser.add_argument_group('Other')
+    group.add_argument('--halwo', dest='halwo', default=None,
+                       help='Add an hallucination word overlap token to each table.')
+    
     args = parser.parse_args()
     
 
@@ -26,6 +30,8 @@ if __name__ == '__main__':
     
     with open(args.dest, mode="w", encoding='utf8') as f:
         for table in tqdm.tqdm(tables, desc=f'Creating f{args.dest}'):
+            if args.halwo is not None:
+                table.append(['HALWO', [f'[HALWO={args.halwo}]']])
             str_table = ' '.join([
                 f'{value}{DELIM}{key}{DELIM}{idx}{DELIM}{len(values)-idx+1}'
                 for key, values in table 
