@@ -13,7 +13,7 @@ import os
 DELIM = u"￨"  # delim used by onmt
 
 
-def create_table(json_example):
+def create_table(json_example, train=True):
     
     table_json = json_example["table"]
     cell_indices = json_example["highlighted_cells"]
@@ -49,6 +49,12 @@ def create_table(json_example):
         table_section_title = table_section_title.replace("|", "-")
         entry = ["section_title", word_tokenize(table_section_title)]
         table.append(entry)
+    
+    # Include Section text for training
+    if table_section_title and train:
+        table_section_title = table_section_title.replace("|", "-")
+        entry = ["section_title", word_tokenize(table_section_title)]
+        table.append(entry)
 
     return table
 
@@ -80,7 +86,7 @@ if __name__ == '__main__':
             for json_example in tqdm.tqdm(FileIterable.from_filename(src_filename, fmt='jl'), desc=desc):
                 raw_data.append(json_example)
                 
-                table = create_table(json_example)
+                table = create_table(json_example, subset=='train')
                 
                 if json_example.get('overlap_subset', False):
                     overlap_tables.append(table)
