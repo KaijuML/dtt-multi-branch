@@ -1,10 +1,11 @@
 """
 Where we store everything which is in common between our scripts
 """
-
+import tqdm.notebook as tqdm_notebook
 import more_itertools
 import itertools
 import overrides
+import tqdm
 import json
 import os
 
@@ -61,11 +62,24 @@ class FileIterable:
     def from_filename(cls, path, func=None, fmt=None):
         no_fmt_given = fmt is None
         fmt = fmt if fmt is not None else 'txt'
-        if not any(path.endswith(ext) for ext in self._ext_mapping[fmt]):
+        if not any(path.endswith(ext) for ext in cls._ext_mapping[fmt]):
             print(f'WARNING: path is {path} but format is {fmt}' \
                   f'{" (by default)" if no_fmt_given else ""}.')
         
         return cls(cls.read_file(path, func, fmt), path)
+    
+    def to_list(self, use_tqdm=True, desc=None):
+        if use_tqdm in [True, 'classic']:
+            _tqdm = tqdm
+        elif use_tqdm == 'notebook':
+            _tqdm = tqdm_notebook
+        else:
+            _tqdm = None
+           
+        desc = desc if desc is not None else ''
+        if _tqdm is not None:
+            return [item for item in _tqdm(self, total=len(self), desc=desc)]
+        return list(self)
     
     @staticmethod
     def read_file(path, func=None, fmt='txt'):
