@@ -111,28 +111,28 @@ if __name__ == '__main__':
         
         max_n_references = 0
         
-        ref_key = 'original_sentence' if subset == 'train' else 'final_sentence'
+        for clean, ref_key in zip(['', '_clean'], ['original_sentence', 'final_sentence']):
         
-        overlap_refs, no_overlap_refs = list(), list()
-        
-        for json_example in tqdm.tqdm(raw_data, desc='Reading all references'):
-            refs = [' '.join(word_tokenize(ref[ref_key]))
-                    for ref in json_example['sentence_annotations']]
-            if json_example.get('overlap_subset', False):
-                overlap_refs.append(refs)
-            else:
-                no_overlap_refs.append(refs)
-            max_n_references = max(max_n_references, len(refs))
-        
-        print(f'Found at most {max_n_references} references for a single input.')
-        
-        for suffix, references in zip(['', '_overlap'], [no_overlap_refs, overlap_refs]):
-            if not len(references): continue
-            for k in range(1, max_n_references+1):
-                output_filename = os.path.join(args.dest, f'{subset}{suffix}_output_{k}.txt')
-                with open(output_filename, mode="w", encoding='utf8') as f:
-                    for refs in tqdm.tqdm(references, desc=f'Writting {k}th references'):
-                        ref = refs[k-1] if k <= len(refs) else ''
-                        f.write(ref + '\n')
+            overlap_refs, no_overlap_refs = list(), list()
+
+            for json_example in tqdm.tqdm(raw_data, desc='Reading all references'):
+                refs = [' '.join(word_tokenize(ref[ref_key]))
+                        for ref in json_example['sentence_annotations']]
+                if json_example.get('overlap_subset', False):
+                    overlap_refs.append(refs)
+                else:
+                    no_overlap_refs.append(refs)
+                max_n_references = max(max_n_references, len(refs))
+
+            print(f'Found at most {max_n_references} references for a single input.')
+
+            for suffix, references in zip(['', '_overlap'], [no_overlap_refs, overlap_refs]):
+                if not len(references): continue
+                for k in range(1, max_n_references+1):
+                    output_filename = os.path.join(args.dest, f'{subset}{suffix}{clean}_output_{k}.txt')
+                    with open(output_filename, mode="w", encoding='utf8') as f:
+                        for refs in tqdm.tqdm(references, desc=f'Writting {k}th references'):
+                            ref = refs[k-1] if k <= len(refs) else ''
+                            f.write(ref + '\n')
                 
         
