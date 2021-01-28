@@ -19,6 +19,7 @@ def create_table(json_example, train=True):
     cell_indices = json_example["highlighted_cells"]
     table_page_title = json_example["table_page_title"]
     table_section_title = json_example["table_section_title"]
+    table_section_text = json_example["table_section_text"]
 
     table = list()
     
@@ -51,9 +52,9 @@ def create_table(json_example, train=True):
         table.append(entry)
     
     # Include Section text for training
-    if table_section_title and train:
-        table_section_title = table_section_title.replace("|", "-")
-        entry = ["section_title", word_tokenize(table_section_title)]
+    if table_section_text and train:
+        table_section_text = table_section_text.replace("|", "-")
+        entry = ["section_text", word_tokenize(table_section_text)]
         table.append(entry)
 
     return table
