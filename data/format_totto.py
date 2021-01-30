@@ -40,7 +40,7 @@ def create_table(json_example, for_parent=False, lowercase=True):
                 else:
                     continue
             value = value.replace("|", "-")
-            entry = ['_'.join(attribute.split()), word_tokenize(maybe_lower(value))]
+            entry = [maybe_lower('_'.join(attribute.split())), word_tokenize(maybe_lower(value))]
             table.append(entry)
 
     # Page title.
