@@ -13,7 +13,11 @@ import os
 DELIM = u"￨"  # delim used by onmt
 
 
-def create_table(json_example, train=True):
+def create_table(json_example, for_parent=False, lowercase=True):
+    
+    def maybe_lower(s):
+        if lowercase: s=s.lower()
+        return s
     
     table_json = json_example["table"]
     cell_indices = json_example["highlighted_cells"]
@@ -36,25 +40,25 @@ def create_table(json_example, train=True):
                 else:
                     continue
             value = value.replace("|", "-")
-            entry = ['_'.join(attribute.split()), word_tokenize(value)]
+            entry = ['_'.join(attribute.split()), word_tokenize(maybe_lower(value))]
             table.append(entry)
 
     # Page title.
     if table_page_title:
         table_page_title = table_page_title.replace("|", "-")
-        entry = ["page_title", word_tokenize(table_page_title)]
+        entry = ["page_title", word_tokenize(maybe_lower(table_page_title))]
         table.append(entry)
 
     # Section title.
     if table_section_title:
         table_section_title = table_section_title.replace("|", "-")
-        entry = ["section_title", word_tokenize(table_section_title)]
+        entry = ["section_title", word_tokenize(maybe_lower(table_section_title))]
         table.append(entry)
     
     # Include Section text for training
-    if table_section_text and train:
+    if table_section_text and not for_parent:
         table_section_text = table_section_text.replace("|", "-")
-        entry = ["section_text", word_tokenize(table_section_text)]
+        entry = ["section_text", word_tokenize(maybe_lower(table_section_text))]
         table.append(entry)
 
     return table
@@ -70,6 +74,10 @@ if __name__ == '__main__':
     group.add_argument('--dest', '-d', dest='dest',
                         help='Name of the folder to store preocessed data.')
     
+    group = parser.add_argument_group('Preprocessing')
+    group.add_argument('--keep_case', dest='keep_case',
+                        help='Dont lowercase.')
+    
     args = parser.parse_args()
     
     for subset in ['dev', 'train']:
@@ -80,6 +88,7 @@ if __name__ == '__main__':
         no_overlap_filename = os.path.join(args.dest, f'{subset}_tables.jl')
         overlap_filename = os.path.join(args.dest, f'{subset}_overlap_tables.jl')
         raw_data = list()
+        parent_tables = [list(), list()]
         with open(overlap_filename, mode="w", encoding='utf8') as overlap_f, open(no_overlap_filename, mode="w", encoding='utf8') as no_overlap_f:
 
             desc = f'Formating tables of ToTTo/{subset}'
@@ -87,16 +96,30 @@ if __name__ == '__main__':
             for json_example in tqdm.tqdm(FileIterable.from_filename(src_filename, fmt='jl'), desc=desc):
                 raw_data.append(json_example)
                 
-                table = create_table(json_example, subset=='train')
+                table = create_table(json_example, for_parent=False, lowercase=not args.keep_case)
+                if subset=='dev':
+                    ptable = create_table(json_example, for_parent=True, lowercase=not args.keep_case)
                 
                 if json_example.get('overlap_subset', False):
                     overlap_tables.append(table)
+                    if subset=='dev': parent_tables[0].append(ptable)
                     overlap_f.write(json.dumps(table)+'\n')
                 else:
                     no_overlap_tables.append(table)
+                    if subset=='dev': parent_tables[1].append(ptable)
                     no_overlap_f.write(json.dumps(table)+'\n')
-                
-                
+                    
+        if len(parent_tables[0]):
+            filename = os.path.join(args.dest, f'{subset}_tables_parent_overlap.jl')
+            with open(filename, mode="w", encoding="utf8") as f:
+                for ptable in parent_tables[0]:
+                    f.write(json.dumps(ptable)+'\n')
+                    
+        if len(parent_tables[1]):
+            filename = os.path.join(args.dest, f'{subset}_tables_parent_nooverlap.jl')
+            with open(filename, mode="w", encoding="utf8") as f:
+                for ptable in parent_tables[1]:
+                    f.write(json.dumps(ptable)+'\n')
             
         for suffix, tables in zip(['', '_overlap'], [no_overlap_tables, overlap_tables]):
             filename = os.path.join(args.dest, f'{subset}{suffix}_input.txt')
@@ -109,6 +132,9 @@ if __name__ == '__main__':
                     ])
                     f.write(str_table + '\n')
                 
+        def maybe_lower(s):
+            if not args.keep_case: s=s.lower()
+            return s
         
         max_n_references = 0
         
@@ -117,7 +143,7 @@ if __name__ == '__main__':
             overlap_refs, no_overlap_refs = list(), list()
 
             for json_example in tqdm.tqdm(raw_data, desc='Reading all references'):
-                refs = [' '.join(word_tokenize(ref[ref_key]))
+                refs = [maybe_lower(' '.join(word_tokenize(ref[ref_key])))
                         for ref in json_example['sentence_annotations']]
                 if json_example.get('overlap_subset', False):
                     overlap_refs.append(refs)
