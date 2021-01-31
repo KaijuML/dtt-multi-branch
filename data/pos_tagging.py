@@ -143,16 +143,16 @@ def run_script(examples, pos_folder, dest, gpus, max_seq_length):
     # removing cached data so that we can continue training on different examples
     shell(f'rm {os.path.join(pos_folder, "cached_test_bert-base-uncased_256")}')
 
-def do_tagging(pos_folder, wiki_folder, setnames, gpus, max_seq_length, split_size=int(5e4)):
-    """This will format the train/dev/test sets of wikibio 
+def do_tagging(pos_folder, dataset_folder, setnames, gpus, max_seq_length, split_size=int(5e4)):
+    """This will format the train/dev/test sets of the dataset 
     so that we can run the PoS tagging network we have trained"""
     
     for setname in setnames:
         assert setname in ['train', 'valid', 'test']
         print(f'Loading examples from {setname}')
         
-        path = os.path.join(wiki_folder, f'{setname}_output.txt')
-        dest = os.path.join(wiki_folder, f'{setname}_pos.txt')
+        path = os.path.join(dataset_folder, f'{setname}_output.txt')
+        dest = os.path.join(dataset_folder, f'{setname}_pos.txt')
         examples = list()
         with open(path, mode='r', encoding='utf8') as f:
             for line in f:
@@ -184,14 +184,16 @@ def do_file(pos_folder, orig, dest, gpus, max_seq_length, split_size=int(5e4)):
     print('Done.')
 
 if __name__ == '__main__':
-    pos_folder = pkg_resources.resource_filename(__name__, 'pos')
-    wiki_folder = pkg_resources.resource_filename(__name__, 'wikibio')
+    this_file_folder = pkg_resources.resource_filename(__name__, '.')
+    
+    # Where the trained model is stored and should be
+    pos_folder = os.path.join(this_file_folder, "pos")
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--do_train', dest='do_train', action='store_true',
                         help='fine-tune BERT with a PoS-tagging task')
     parser.add_argument('--do_tagging', dest='do_tagging', nargs='+',
-                        help='use fine-tuned BERT to tag sentences in WikiBIO.'
+                        help='use fine-tuned BERT to tag sentences in WikiBIO/ToTTo.'
                              'Specify any combinason of [train, valid, test]')
     parser.add_argument('--gpus', dest='gpus', nargs="+", type=int, 
                         help='list of devices to train/predict on.')
@@ -199,7 +201,7 @@ if __name__ == '__main__':
     parser.add_argument('--split_size', dest='split_size', type=int, default=5e4,
                         help='To be memory efficient, process this much line at once only.')
     parser.add_argument('--pos_folder', dest='pos_folder', default=pos_folder)
-    parser.add_argument('--wiki_folder', dest='wiki_folder', default=wiki_folder)
+    parser.add_argument('--dataset_folder', dest='dataset_folder', default=None)
 
     # These arguments are for stand-alone file
     parser.add_argument('--orig', '-o', dest='orig',
@@ -220,7 +222,7 @@ if __name__ == '__main__':
         do_train(args.pos_folder, gpus, args.max_seq_length)
         
     if args.do_tagging:
-        do_tagging(args.pos_folder, args.wiki_folder, args.do_tagging, gpus, args.max_seq_length, args.split_size)
+        do_tagging(args.pos_folder, args.dataset_folder, args.do_tagging, gpus, args.max_seq_length, args.split_size)
         
     if args.orig:
         assert os.path.exists(args.orig)

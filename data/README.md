@@ -1,7 +1,9 @@
 # Dataset creation
 
 Instructions to download and format datasets for this projects.
-WikiBIO formatting script comes from [this great repo](https://github.com/tyliupku/wiki2bio/blob/master/preprocess.py)
+WikiBIO initial formatting script comes from [this great repo](https://github.com/tyliupku/wiki2bio/blob/master/preprocess.py)
+
+Most of the time, we show how to use scripts for WikiBio, but everything works for ToTTo as well.
 
 Scripts assume you are in the `data/` repository, with the following file:
 
@@ -98,12 +100,16 @@ We use huggingface/transformers to train a PoS-tagger on [UniversalDependencies 
 
 In order to do this, you will need the following libraries: `pip install transformers pyconll seqeval tensorboardX`
 
-To train the model and tag WikiBIO training set (training is quick (few minutes) however tagging the ~700K
+To train the model and tag a training set (training is quick (few minutes) however tagging the ~700K
 WikiBIO examples can take one or two hours):
 
 ```bash
-python3 pos_tagging.py --do_train --do_tagging train --gpus 0 1
+python3 pos_tagging.py --do_train --do_tagging train --gpus 0 1 --dataset_folder wikibio
 ```
+
+(`--do_train` means we train the PoS model; 
+`--do_tagging train` means we use the trained model to tag the file `wikibio/train_output.txt`; 
+use `--dataset_folder` to specify where you stored the files obtained in previous steps)
 
 You should now find the PoS file in `wikibio/train_pos.txt`
 
