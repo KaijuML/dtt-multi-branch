@@ -3,7 +3,7 @@ import json
 
 from nltk.translate.bleu_score import corpus_bleu
 from data.utils import FileIterable
-from parent import parent
+from parent.parent import parent
 from tqdm import tqdm
 
 
