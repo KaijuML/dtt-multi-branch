@@ -51,13 +51,16 @@ create the dataset:
 python3 format_totto.py --orig totto_data --dest totto
 ```
 
-The whole OpenNMT-ready dataset can now be found in `wikibio/full`:
+The whole OpenNMT-ready dataset can now be found in `wikibio/full` and `totto`:
 ```
 .
 └── wikibio/
 │   ├── raw/
 │   ├── process_data/
 │   └── full/
+└── totto/
+│   ├── train_tables.jl
+|   ...
 ├── co_occurrence.py
 ├── count_co_occurrences.py
 ├── dep_parsing_spacy.py
@@ -66,7 +69,8 @@ The whole OpenNMT-ready dataset can now be found in `wikibio/full`:
 ├── pos_tagging.py
 ├── remove_long_sentences.py
 ├── run_ner.py
-├── utils_ner.py        
+├── utils_ner.py
+...
 ```
 
 However, this work relies on Part-of-Speech tagging and Dependency parsing. The former is done using a BERT model
