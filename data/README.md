@@ -85,6 +85,8 @@ supported):
 python3 remove_long_sentences.py --max_size 256 --model bert-base-uncased
 ```
 
+(Note that this script fill run on the `wikibio/full` dataset but can easily be adapated for more flexibility. We foudn that ToTTo examples were short so didn't include flexibility in this script)
+
 
 ## WikiBIO pre-processing
 In order to train our multi-branch decoder, every training token must be associated to an "hallucination score", which,
