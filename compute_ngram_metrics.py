@@ -12,9 +12,9 @@ def _corpus_bleu(hypotheses, references):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Compute BLEU and PARENT metrics.')
-    parser.add_argument('tables')
-    parser.add_argument('references', nargs='+')
-    parser.add_argument('hypotheses')
+    parser.add_argument('--tables', dest="tables")
+    parser.add_argument('--references', dest="references", nargs='+')
+    parser.add_argument('--hypotheses', dest="hypotheses")
 
     args = parser.parse_args()
     
@@ -28,7 +28,7 @@ if __name__ == '__main__':
     print('OK')
 
     print('Computing PARENT... ', end='')
-    references = [r[0] for r in references]
+    #references = [r[0] for r in references]
     parent_p, parent_r, parent_f = parent(hypotheses, references, tables)
     print('OK')
 
