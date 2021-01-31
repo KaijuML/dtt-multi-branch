@@ -53,7 +53,7 @@ create the dataset:
 python3 format_totto.py --orig totto_data --dest totto
 ```
 
-The whole OpenNMT-ready dataset can now be found in `wikibio/full` and `totto`:
+The whole OpenNMT-ready datasets can now be found in `wikibio/full` and `totto`:
 ```
 .
 └── wikibio/
