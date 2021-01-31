@@ -12,11 +12,13 @@ To work work with OpenNMT-py, you will need the following libraries:
 pip3 install torch torchtext configargpase
 ```
 
+Note that most command are given for WikiBio, but will also work for ToTTo. If something is not straight forward, please open an issue or create a discussion.
+
 # Dataset: download & format
 
 For all dataset related operations, please refer to `data/README.md`
 
-You can download a file where each token has been scored, and examples are separated by empty lines
+We provide already an processed file for the WikiBio dataset: You can download a file where each line is a scored token, and examples are separated by empty lines
 
 ```bash
 wget https://datacloud.di.unito.it/index.php/s/zWs2MTzB6Bxfksw/download
@@ -32,7 +34,7 @@ python3 data/format_weights.py --orig download --dest train_weights.txt --strate
 This will use a fixed weight for the fluency factor (called in the script regularization) and will give token to the content branch if they are scored below 0.4, else to the hallucination branch. --normalize means weights are normalized by their sum (so that they sum to 1)
 
 
-Note that you can train model on a small version of the dataset using, which can be created with the following script:
+Note that if you want to train a model on a small version of the dataset for practical reasons, you can create it with the following script:
 
 ```bash
 python3 data/truncate_wikibio.py --folder small --max_size 1e4 --setname train test
@@ -81,7 +83,7 @@ This will generate text for every saved checkpoints with a batch size 64 and a b
 
 ### BLEU and  PARENT
 We evaluate using the [BLEU](https://www.aclweb.org/anthology/P02-1040.pdf) classic metric and
-[PARENT](https://www.aclweb.org/anthology/P19-1483.pdf), which his more suitable for the table-to-text generation task.
+[PARENT](https://www.aclweb.org/anthology/P19-1483.pdf), which is more suitable for the table-to-text generation task.
 Those n-gram based metrics can be computed as follows:
 ```bash
 python3 compute_ngram_metrics.py data/wikibio/test_tables.jl data/wikibio/test_output.txt $OUTPUT_FILE
