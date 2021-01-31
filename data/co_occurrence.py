@@ -241,13 +241,14 @@ def count_co_occurrences(filename, tables_loc, pos_loc):
                          total=len(tables)):
 
         for key, values in table:
-            table_items = [(key, value) for value in values]
-            for table_item in table_items:
+            table_items = [(key.split('_'), value) for value in values]
+            for keys, value in table_items:
                 # Only include interestingly tagged tokens that are not equal to the table value
                 # noinspection PyTypeChecker
-                co_occur.setdefault(table_item, Counter()) \
-                    .update([token for token, pos in sentence
-                             if pos in interesting_tags and token != table_item[-1]])
+                for k in keys:
+                    co_occur.setdefault((k, value), Counter()) \
+                        .update([token for token, pos in sentence
+                                 if pos in interesting_tags and token != value])
     
     # We filter the co_occur dictionary.
     # We keep only elements whose total co_occurrences number is in the 5th percentile
