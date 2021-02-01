@@ -119,6 +119,8 @@ class ArgumentParser(cfargparse.ArgumentParser):
 
         assert len(opt.attention_dropout) == len(opt.dropout_steps), \
             "Number of attention_dropout values must match accum_steps values"
+        assert not opt.train_with_rl, \
+            "Don't train with RL in this project"
 
     @classmethod
     def validate_translate_opts(cls, opt):
