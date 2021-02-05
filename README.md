@@ -1,10 +1,17 @@
-# dtt-hallucinations-disentanglement
+# Controlling Hallucinations at Word Level in Data-to-Text Generation
 
-This repo is for training a data-to-text encoder-decoder, whose decoder is multi-branch: during decoding, it weights several RNNs to compute probability of next token.
+Code for our paper [Controlling Hallucinations at Word Level in Data-to-Text Generation](https://arxiv.org/abs/2102.02810) (Clément Rebuffel, Marco Roberti, Laure Soulier, Geoffrey Scoutheeten, Rossella Cancelliere, Patrick Gallinari).
 
-During training, weights are conditioned based on the probability of the target token to be a divergence from the table.
+With this code, you train a data-to-text encoder-decoder, whose decoder is multi-branch: during decoding, it weights several RNNs to compute probability of next token.
 
-During inference, weights are fixed to only use RNNs which where associated to non-diverging tokens during training.
+  1) During training, weights are conditioned based on the probability of the target token to be a divergence from the table.  
+  2) During inference, weights are fixed to only use RNNs which where associated to non-diverging tokens during training.
+  
+We also provide preprocessing scripts that work on WikiBio and ToTTo; as well as evaluation scripts for all metrics reported in the paper.
+
+Note that most command are given for WikiBio, but will also work for ToTTo. If something is not straight forward, please open an issue or create a discussion.
+
+### Requirements
 
 To work work with OpenNMT-py, you will need the following libraries:
 
@@ -12,9 +19,8 @@ To work work with OpenNMT-py, you will need the following libraries:
 pip3 install torch torchtext configargpase
 ```
 
-Note that most command are given for WikiBio, but will also work for ToTTo. If something is not straight forward, please open an issue or create a discussion.
 
-# Dataset: download & format
+## Dataset: download & format
 
 For all dataset related operations, please refer to `data/README.md`
 
@@ -42,7 +48,7 @@ python3 data/truncate_wikibio.py --folder small --max_size 1e4 --setname train t
 
 
 
-# Training
+## Training
 
 First things first, we compartmentalize experiments.
 
@@ -68,7 +74,7 @@ python3 run_onmt.py --train --config train_mbd.cfg
 Please note that the model reported in our paper can be trained using the `train_mbd.cfg` config file.
 
 
-# Inference
+## Inference
 
 The previous training step has saved checkpoints across time. In order to find the best check point, you can use the following command:
 
@@ -79,7 +85,7 @@ python3 batch_translate.py --dataset wikibio --setname valid --experiment small 
 This will generate text for every saved checkpoints with a batch size 64 and a beam size 10.
 
 
-# Evaluation
+## Evaluation
 
 ### BLEU and  PARENT
 We evaluate using the [BLEU](https://www.aclweb.org/anthology/P02-1040.pdf) classic metric and
