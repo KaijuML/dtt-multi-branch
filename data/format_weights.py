@@ -57,6 +57,15 @@ class Strategy:
         self.normalize = normalize
         self.weight_regularization = weight_regularization
 
+        if eos_weights is None:
+            raise ValueError('Please specify --eos_weights. These weights are '
+                             'used for the End Of Sentence token. In the '
+                             'original paper, these weights were set to [1, 0]'
+                             ', meaning that the eos token is always the '
+                             'responsability of the factuallness branch. Note '
+                             'that if weight_regularization is set, it will '
+                             'automatically be taken into account and you do '
+                             'not need to include it in --eos_weights')
         assert all(isinstance(w, (float, int)) for w in eos_weights)
         if weight_regularization > 0:
             eos_weights.insert(0, weight_regularization)
@@ -208,19 +217,14 @@ if __name__ == '__main__':
         
     if os.path.exists(args.dest):
         print('\nWARNING:',
-              f'{args.dest} already exists, it will be overwritten.',
+              f'destintation file {os.path.abspath(args.dest)} already exists, it will be overwritten.',
               'Stop the process ASAP to avoid this\n')
     else:
         # we use this touch to verify dest is a valid path
         # so that the script does not run if it's not the case
+        print(f'Writting formatted wieghts to: {os.path.abspath(args.dest)}')
         with open(args.dest, mode="w", encoding='utf8') as f:
             pass 
-    
-    print('Reading orig file. Can take up to a minute.')
-    scored_sentences = [
-        sent for sent in TaggedFileIterable.from_filename(
-            args.orig, func=lambda x,y: (x, float(y)))
-    ]
     
     strategy = strategies[args.strategy](
         eos_weights=args.eos_weights, 
@@ -230,8 +234,14 @@ if __name__ == '__main__':
         thresholds=args.thresholds
     )
     
+    print('Reading orig file. Can take up to a minute.')
+    scored_sentences = [
+        sent for sent in TaggedFileIterable.from_filename(
+            args.orig, func=lambda x,y: (x, float(y)))
+    ]
+    
     n_jobs = mp.cpu_count() if args.n_jobs < 0 else args.n_jobs
-    print(f'Using {n_jobs} processes, starting now')
+    print(f'Formatting weights, using {n_jobs} processes, starting now')
     with open(args.dest, mode="w", encoding='utf8') as f, mp.Pool(processes=n_jobs) as pool:
         _iterable = pool.imap(
             strategy.format_instance, 

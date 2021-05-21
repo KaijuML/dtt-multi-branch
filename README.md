@@ -56,6 +56,12 @@ First things first, we compartmentalize experiments.
 python3 create-experiment.py --dataset wikibio --name mbd
 ```
 
+An experiment folder is now available at `experiments/wikibio/mbd`. You can move the previously created weights there:
+
+```bash
+mv train_weights.txt experiments/wikibio/mbd/train_weights.txt
+```
+
 We use the OpenNMT-py framework for training, included in `onmt/`. Our model has been added to our version of the repo.
 Training needs a preprocessing step:
 
