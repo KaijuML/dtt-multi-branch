@@ -34,10 +34,10 @@ mv download data/
 This file can be processed into OpenNMT-readable file with:
 
 ```bash
-python3 data/format_weights.py --orig download --dest train_weights.txt --strategy thresholds --thresholds 0.4 --normalize --weight_regularization 1
+python3 data/format_weights.py --orig data/download --dest train_weights.txt --strategy thresholds --thresholds 0.4 --normalize --weight_regularization 1 --eos_weights 1 0
 ```
 
-This will use a fixed weight for the fluency factor (called in the script regularization) and will give token to the content branch if they are scored below 0.4, else to the hallucination branch. --normalize means weights are normalized by their sum (so that they sum to 1)
+This will use a fixed weight for the fluency factor (called in the script `weight_regularization`) and will give token to the content branch if they are scored below 0.4, else to the hallucination branch. `--normalize` means weights are normalized by their sum (so that they sum to 1) and `--eos_weights 1 0` means that the End-of-Sequence token will be the responsability of the content branch.
 
 
 Note that if you want to train a model on a small version of the dataset for practical reasons, you can create it with the following script:
