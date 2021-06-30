@@ -13,10 +13,10 @@ Note that most command are given for WikiBio, but will also work for ToTTo. If s
 
 ### Requirements
 
-To work work with OpenNMT-py, you will need the following libraries:
+You can install all needed packages using the following command:
 
 ```bash
-pip3 install torch torchtext configargpase
+pip3 install -r requirements.txt
 ```
 
 

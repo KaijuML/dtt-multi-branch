@@ -36,10 +36,10 @@ cd ..
 rm -rf wikipedia-biography-dataset
 ```
 
-create the dataset:
+create the dataset (remove `--first_sentence` if you want to train on paragraphs):
 
 ```bash
-python3 format_wikibio.py
+python3 format_wikibio.py --first_sentence
 ```
 
 Download and upack the ToTTo dataset:
