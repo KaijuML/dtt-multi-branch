@@ -11,7 +11,7 @@ Scripts assume you are in the `data/` repository, with the following file:
 .
 ├── co_occurrence.py
 ├── count_co_occurrences.py
-├── dep_parsing_spacy.py
+├── dep_parsing_gpu.py
 ├── format_weights.py
 ├── format_wikibio.py
 ├── pos_tagging.py
@@ -65,7 +65,7 @@ The whole OpenNMT-ready datasets can now be found in `wikibio/full` and `totto`:
 |   ...
 ├── co_occurrence.py
 ├── count_co_occurrences.py
-├── dep_parsing_spacy.py
+├── dep_parsing_gpu.py
 ├── format_weights.py
 ├── format_wikibio.py
 ├── pos_tagging.py
@@ -115,10 +115,10 @@ You should now find the PoS file in `wikibio/train_pos.txt`
 
 ### Dependency parsing
 
-We use [SpaCy](http://www.spacy.org) to parse WikiBIO training set:
+We use [Stanza](https://stanfordnlp.github.io/stanza/) to parse WikiBIO training set:
 
 ```bash
-python3 dep_parsing_spacy.py --orig wikibio/train_output.txt --dest wikibio/train_deprel.txt --format sent
+python3 dep_parsing_gpu.py --orig wikibio/train_output.txt --dest wikibio/train_deprel.txt --parser stanza --bsize 64 --format sent
 ```
 
 You should now find the dependency relations file in `wikibio/train_deprel.txt`

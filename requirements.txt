@@ -9,3 +9,5 @@ numpy
 tqdm
 more_itertools
 overrides
+stanza==1.2
+spacy==2.2.4
