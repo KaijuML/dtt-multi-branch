@@ -53,7 +53,7 @@ def _load_allennlp(_args):
     from allennlp.data.tokenizers.word_splitter import SpacyWordSplitter
     predictor = Predictor.from_path(
         "https://s3-us-west-2.amazonaws.com/allennlp/models/biaffine-dependency-parser-ptb-2018.08.23.tar.gz",
-        cuda_device=device.index or -1
+        cuda_device=device.index if device.type == 'cuda' else -1
     )
     predictor._tokenizer = SpacyWordSplitter(pos_tags=True, split_on_spaces=True)
     return predictor
@@ -72,7 +72,7 @@ def _load_stanza(_args):
     try:
         model = stanza.Pipeline(
             lang="en", processors='tokenize,pos,lemma,depparse', depparse_batch_size=_args.batch_size)
-    except FileNotFoundError:
+    except Exception:
         stanza.download('en')
         model = stanza.Pipeline(
             lang="en", processors='tokenize,pos,lemma,depparse', depparse_batch_size=_args.batch_size)
