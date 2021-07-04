@@ -13,6 +13,14 @@ Note that most command are given for WikiBio, but will also work for ToTTo. If s
 
 ### Requirements
 
+You can run this code using python 3.8. Using conda, you can create an env with:
+
+```bash
+conda create --name dtt python=3.8
+```
+
+Simply activate the env: `conda activate dtt`
+
 You can install all needed packages using the following command:
 
 ```bash
