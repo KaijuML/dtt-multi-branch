@@ -12,7 +12,7 @@ from statistics import mean
 
 import tqdm
 
-from data.utils import FileIterable, TaggedFileIterable
+from utils import FileIterable, TaggedFileIterable
 
 tok_mapping = {
     '-lrb-': '(',
