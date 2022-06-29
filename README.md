@@ -35,7 +35,7 @@ For all dataset related operations, please refer to `data/README.md`
 We provide already an processed file for the WikiBio dataset: You can download a file where each line is a scored token, and examples are separated by empty lines
 
 ```bash
-wget https://datacloud.di.unito.it/index.php/s/jFHFpBbHB9KmEzZ/download
+wget https://marcoroberti.cloudtb.online/wikibio_train_h.txt
 mv download data/
 ```
 
